@@ -17,10 +17,12 @@ public:
     float readTemperature() override;
     float readHumidity() override;
     float readSoilMoisture(uint8_t zone) override;
+    float readTankLevel() override;
 
 private:
     // Averaging buffers for each soil zone
     AveragingBuffer<uint16_t, 8> soilBuffers[ZONE_COUNT];
+    AveragingBuffer<uint16_t, 4> tankBuffer;
 
     // Read raw analog ADC value for the specific zone
     uint16_t readRawSoilADC(uint8_t zone);

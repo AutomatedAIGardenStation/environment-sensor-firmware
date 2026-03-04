@@ -37,6 +37,13 @@ public:
      * @return Soil moisture in %, or -999.0f on invalid zone or read failure.
      */
     virtual float readSoilMoisture(uint8_t zone) = 0;
+
+    /**
+     * Reads analog tank level value and converts to 0-100%.
+     * Applies internal averaging to reduce noise.
+     * @return Tank level in %, or -999.0f on read failure.
+     */
+    virtual float readTankLevel() = 0;
 };
 
 #endif // ISENSORBUS_H
