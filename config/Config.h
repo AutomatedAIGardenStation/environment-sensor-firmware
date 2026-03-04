@@ -14,6 +14,8 @@
 #define TANK_EMPTY_THRESHOLD_PCT  10    // percent below which EVT:TANK_EMPTY fires
 #define ZONE_COUNT                4     // number of independently controllable water zones
 #define LED_CHANNEL_COUNT         4     // number of LED PWM channels
+#define PWM_FREQ                  1000  // 1000 Hz PWM frequency
+#define PWM_RESOLUTION            13    // 13-bit PWM resolution
 
 #if defined(ARDUINO_AVR_NANO) || defined(ARDUINO_AVR_UNO)
   // ── Arduino Nano / Uno (ATmega328P) ────────────────────────────────────

@@ -12,6 +12,7 @@
  */
 #include <Arduino.h>
 #include "protocol.h"
+#include "../lib/actuators/PwmDriver.h"
 
 #define SERIAL_BAUD      115200
 #define LINE_BUF_SIZE    128
@@ -23,6 +24,8 @@ static uint8_t  g_line_len       = 0;
 static uint32_t g_last_hb_ms     = 0;
 static uint32_t g_last_sensor_ms = 0;
 
+static PwmDriver g_pwmDriver;
+
 void setup() {
     Serial.begin(SERIAL_BAUD);
     while (!Serial) { /* wait for USB-serial on native-USB boards */ }
@@ -31,7 +34,11 @@ void setup() {
     g_last_hb_ms    = millis();
     g_last_sensor_ms = millis();
 
-    // TODO: initialise relay pins, PWM channels, sensor buses here
+    // Initialize PWM Driver
+    g_pwmDriver.begin();
+    protocol_set_pwm_driver(&g_pwmDriver);
+
+    // TODO: initialise relay pins, sensor buses here
     protocol_emit_event("EVT:BOOT:fw=env_controller:v=0.1.0");
 }
 
