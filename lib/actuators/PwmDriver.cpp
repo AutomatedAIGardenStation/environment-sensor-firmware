@@ -38,26 +38,30 @@ void PwmDriver::setChannel(uint8_t ch, uint8_t pct) {
 void PwmDriver::setLedChannel(uint8_t ch, uint8_t pct) {
 #ifdef PIN_LED_CH1
     if (ch >= LED_CHANNEL_COUNT) return;
-    if (pct > 100) pct = 100;
+    uint8_t safe_pct = (pct > 100) ? 100 : pct;
 
 #if defined(ARDUINO_ESP32_DEV) || defined(ESP32)
-    ledcWrite(ch, map_pct_to_duty(pct));
+    ledcWrite(ch, map_pct_to_duty(safe_pct));
 #elif defined(ARDUINO)
     // Fallback for AVR, 8-bit PWM (0-255)
     const uint8_t led_pins[LED_CHANNEL_COUNT] = { PIN_LED_CH1, PIN_LED_CH2, PIN_LED_CH3, PIN_LED_CH4 };
-    analogWrite(led_pins[ch], pct * 255 / 100);
+    analogWrite(led_pins[ch], safe_pct * 255 / 100);
+#else
+    (void)safe_pct; // Suppress unused warning if neither is defined
 #endif
 #endif
 }
 
 void PwmDriver::setFan(uint8_t pct) {
 #ifdef PIN_FAN
-    if (pct > 100) pct = 100;
+    uint8_t safe_pct = (pct > 100) ? 100 : pct;
 
 #if defined(ARDUINO_ESP32_DEV) || defined(ESP32)
-    ledcWrite(4, map_pct_to_duty(pct));
+    ledcWrite(4, map_pct_to_duty(safe_pct));
 #elif defined(ARDUINO)
-    analogWrite(PIN_FAN, pct * 255 / 100);
+    analogWrite(PIN_FAN, safe_pct * 255 / 100);
+#else
+    (void)safe_pct; // Suppress unused warning if neither is defined
 #endif
 #endif
 }

@@ -13,6 +13,8 @@
 #include <Arduino.h>
 #include "protocol.h"
 #include "../lib/actuators/PwmDriver.h"
+#include "../lib/actuators/RelayDriver.h"
+#include "../lib/actuators/HydraulicWatchdog.h"
 
 #define SERIAL_BAUD      115200
 #define LINE_BUF_SIZE    128
@@ -25,6 +27,8 @@ static uint32_t g_last_hb_ms     = 0;
 static uint32_t g_last_sensor_ms = 0;
 
 static PwmDriver g_pwmDriver;
+static RelayDriver g_relayDriver;
+static HydraulicWatchdog g_watchdog(&g_relayDriver);
 
 void setup() {
     Serial.begin(SERIAL_BAUD);
@@ -38,7 +42,12 @@ void setup() {
     g_pwmDriver.begin();
     protocol_set_pwm_driver(&g_pwmDriver);
 
-    // TODO: initialise relay pins, sensor buses here
+    // Initialize Relay Driver
+    g_relayDriver.begin();
+    protocol_set_relay_driver(&g_relayDriver);
+    protocol_set_watchdog(&g_watchdog);
+
+    // TODO: initialise sensor buses here
     protocol_emit_event("EVT:BOOT:fw=env_controller:v=0.1.0");
 }
 
@@ -59,6 +68,8 @@ void loop() {
     }
 
     uint32_t now = millis();
+
+    g_watchdog.tick(now);
 
     // ── Heartbeat ────────────────────────────────────────────────────────────
     if ((now - g_last_hb_ms) >= HEARTBEAT_MS) {

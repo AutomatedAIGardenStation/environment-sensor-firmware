@@ -28,6 +28,8 @@
 #define EVT_HEARTBEAT        "EVT:HEARTBEAT"         // :status=OK
 
 class PwmDriver; // Forward declaration
+class IRelayDriver;
+class HydraulicWatchdog;
 
 // ── Public API ───────────────────────────────────────────────────────────────
 bool protocol_handle_line(const char* line);
@@ -35,5 +37,9 @@ void protocol_emit_event(const char* event);
 
 // Setter to allow dependency injection for the PwmDriver
 void protocol_set_pwm_driver(PwmDriver* driver);
+
+// Setters for new drivers
+void protocol_set_relay_driver(IRelayDriver* driver);
+void protocol_set_watchdog(HydraulicWatchdog* wd);
 
 #endif  // PROTOCOL_H

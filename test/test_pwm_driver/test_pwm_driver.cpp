@@ -4,6 +4,11 @@
 #include "../../lib/actuators/PwmDriver.h"
 #include "Arduino.h"
 
+uint32_t current_time_ms_pwm = 0;
+uint32_t millis() {
+    return current_time_ms_pwm;
+}
+
 // Instantiate the drivers
 MockPwmDriver mockDriver;
 PwmDriver realDriver;

@@ -9,9 +9,14 @@
 #include <stdlib.h>
 #include <string.h>   // strncmp, strlen, memchr
 #include "../lib/actuators/PwmDriver.h"
+#include "../lib/actuators/HydraulicWatchdog.h"
+#include "../lib/hal/IRelayDriver.h"
+#include "../config/Config.h"
 
 // Global driver instance set by main or tests
 static PwmDriver* g_pwmDriver = nullptr;
+static IRelayDriver* g_relayDriver = nullptr;
+static HydraulicWatchdog* g_watchdog = nullptr;
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -25,13 +30,31 @@ static inline bool cmd_match(const char* line, const char* cmd, size_t line_len)
 // ── stubs ─────────────────────────────────────────────────────────────────────
 
 static void pump_start(const char* params) {
-    // TODO: enable relay/MOSFET for the requested zone pump
-    // Parse ":zone=<id>" from params if needed
-    (void)params;
+    uint8_t zone = 0;
+    if (params) {
+        const char* zone_str = strstr(params, "zone=");
+        if (zone_str) {
+            zone = atoi(zone_str + 5);
+        }
+    }
+
+    if (g_relayDriver) {
+        g_relayDriver->setRelay(zone, true);
+    }
+    if (g_watchdog) {
+        g_watchdog->start(zone, millis());
+    }
 }
 
 static void pump_stop_all() {
-    // TODO: disable all pump relays
+    if (g_relayDriver) {
+        for (uint8_t i = 0; i < ZONE_COUNT; i++) {
+            g_relayDriver->setRelay(i, false);
+        }
+    }
+    if (g_watchdog) {
+        g_watchdog->stop();
+    }
 }
 
 static void nutrient_dose() {
@@ -74,6 +97,14 @@ void protocol_set_pwm_driver(PwmDriver* driver) {
     g_pwmDriver = driver;
 }
 
+void protocol_set_relay_driver(IRelayDriver* driver) {
+    g_relayDriver = driver;
+}
+
+void protocol_set_watchdog(HydraulicWatchdog* wd) {
+    g_watchdog = wd;
+}
+
 static void read_and_emit_sensors() {
     // TODO: read all sensors (temp, humidity, pH, EC, tank level) and emit:
     //   EVT:SENSOR_DATA:temp=<n>:hum=<n>:ph=<n>:ec=<n>:level=<n>
@@ -101,6 +132,10 @@ bool protocol_handle_line(const char* line) {
     if (cmd_match(line, CMD_WATER_STOP, len)) {
         pump_stop_all();
         protocol_emit_event(EVT_WATER_DONE);
+        return true;
+    }
+    if (cmd_match(line, "W1", len)) {
+        pump_start("zone=0");
         return true;
     }
     if (cmd_match(line, CMD_FEED, len)) {
