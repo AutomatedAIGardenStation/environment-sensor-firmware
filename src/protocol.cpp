@@ -6,7 +6,12 @@
  */
 #include "protocol.h"
 #include <Arduino.h>
+#include <stdlib.h>
 #include <string.h>   // strncmp, strlen, memchr
+#include "../lib/actuators/PwmDriver.h"
+
+// Global driver instance set by main or tests
+static PwmDriver* g_pwmDriver = nullptr;
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -34,13 +39,39 @@ static void nutrient_dose() {
 }
 
 static void light_set(const char* params) {
-    // TODO: parse ":ch=<n>:pct=<0-100>" and write PWM to LED channel
-    (void)params;
+    if (!g_pwmDriver || !params) return;
+
+    // Parse ":ch=<n>:pct=<0-100>"
+    const char* ch_str = strstr(params, "ch=");
+    const char* pct_str = strstr(params, "pct=");
+
+    if (ch_str && pct_str) {
+        uint8_t ch = atoi(ch_str + 3);
+        uint8_t pct = atoi(pct_str + 4);
+        g_pwmDriver->setLedChannel(ch, pct);
+    }
+}
+
+static void light_legacy_all_on() {
+    if (!g_pwmDriver) return;
+    for (uint8_t i = 0; i < 4; i++) {
+        g_pwmDriver->setLedChannel(i, 100);
+    }
 }
 
 static void fan_set(const char* params) {
-    // TODO: parse ":pct=<0-100>" and write PWM to fan output
-    (void)params;
+    if (!g_pwmDriver || !params) return;
+
+    // Parse ":pct=<0-100>"
+    const char* pct_str = strstr(params, "pct=");
+    if (pct_str) {
+        uint8_t pct = atoi(pct_str + 4);
+        g_pwmDriver->setFan(pct);
+    }
+}
+
+void protocol_set_pwm_driver(PwmDriver* driver) {
+    g_pwmDriver = driver;
 }
 
 static void read_and_emit_sensors() {
@@ -86,6 +117,10 @@ bool protocol_handle_line(const char* line) {
     }
     if (cmd_match(line, CMD_SENSOR_READ, len)) {
         read_and_emit_sensors();
+        return true;
+    }
+    if (cmd_match(line, "L1", len)) {
+        light_legacy_all_on();
         return true;
     }
     if (cmd_match(line, CMD_NOP, len)) {

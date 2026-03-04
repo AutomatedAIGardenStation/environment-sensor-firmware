@@ -27,8 +27,13 @@
 #define EVT_SENSOR_DATA      "EVT:SENSOR_DATA"       // :temp=<n>:hum=<n>:ph=<n>:ec=<n>:level=<n>
 #define EVT_HEARTBEAT        "EVT:HEARTBEAT"         // :status=OK
 
+class PwmDriver; // Forward declaration
+
 // ── Public API ───────────────────────────────────────────────────────────────
 bool protocol_handle_line(const char* line);
 void protocol_emit_event(const char* event);
+
+// Setter to allow dependency injection for the PwmDriver
+void protocol_set_pwm_driver(PwmDriver* driver);
 
 #endif  // PROTOCOL_H
