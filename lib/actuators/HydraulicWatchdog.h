@@ -6,7 +6,7 @@
 
 class HydraulicWatchdog {
 public:
-    HydraulicWatchdog(IRelayDriver* driver);
+    explicit HydraulicWatchdog(IRelayDriver* driver);
 
     void start(uint8_t zone, uint32_t now_ms);
     void stop();
