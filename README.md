@@ -33,7 +33,7 @@ Available environments: `nanoatmega328`, `uno`, `esp32dev`
 env_controller/
 ├── platformio.ini      # PlatformIO environments for supported boards
 ├── config/
-│   └── pins.h          # Board-specific pin assignments – edit for your wiring
+│   └── Config.h        # Board-specific pin assignments and global constants
 └── src/
     ├── main.cpp        # Setup / loop, Serial reader, heartbeat, sensor polling
     ├── protocol.h      # Command & event constants, public API
@@ -58,7 +58,7 @@ env_controller/
 ## Development Notes
 
 - Implement HAL stubs in `src/protocol.cpp` (pump relay toggling, PWM writes, real sensor reads).
-- Update `config/pins.h` to match your physical wiring and MCU choice.
+- Update `config/Config.h` to match your physical wiring and MCU choice.
 - The firmware emits sensor data automatically every 10 s **and** on `SENSOR_READ` command.
 - Heartbeat is emitted every 5 s. A missing heartbeat is treated as a controller fault by the backend.
 - **Safety hard-limit**: `WATER_START` must enforce a maximum on-time guard in firmware. Never allow a pump to run indefinitely regardless of backend state.
