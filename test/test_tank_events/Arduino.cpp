@@ -1,18 +1,23 @@
 #include "Arduino.h"
 #include <string.h>
 
-MockSerial Serial;
+MockSerialTank Serial;
 
 // Global buffer for last event printed to Serial
 char last_emitted_event[256];
+char all_emitted_events[1024];
 
-void MockSerial::print(const char* s) {
+void MockSerialTank::print(const char* s) {
     // optional stub
 }
 
-void MockSerial::println(const char* s) {
+void MockSerialTank::println(const char* s) {
     strncpy(last_emitted_event, s, sizeof(last_emitted_event) - 1);
     last_emitted_event[sizeof(last_emitted_event) - 1] = '\0';
+
+    // Also append to all_emitted_events
+    strncat(all_emitted_events, s, sizeof(all_emitted_events) - strlen(all_emitted_events) - 1);
+    strncat(all_emitted_events, "\n", sizeof(all_emitted_events) - strlen(all_emitted_events) - 1);
 }
 
 uint8_t mock_ledc_channel = 0xFF;
@@ -34,9 +39,7 @@ void analogWrite(uint8_t pin, int val) {
     mock_analog_val = val;
 }
 
-int analogRead(uint8_t pin) {
-    return mock_analog_val;
-}
+int analogRead(uint8_t pin); // Implemented in test_tank_events.cpp
 
 void pinMode(uint8_t pin, uint8_t mode) {}
-void digitalWrite(uint8_t pin, uint8_t val) {}
+void digitalWrite(uint8_t pin, uint8_t val); // Implemented in test_tank_events.cpp

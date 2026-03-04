@@ -1,6 +1,9 @@
 #include "SensorBus.h"
 #include <Arduino.h>
+
+#ifndef NATIVE_TEST
 #include <Wire.h>
+#endif
 
 // If you want actual logic to connect to a sensor (e.g. SHT31, DHT22)
 // you'd include its library here.
@@ -16,10 +19,12 @@ SensorBus::~SensorBus() {
 void SensorBus::begin() {
     // Initialize I2C bus
     // ESP32 usually allows specifying pins in begin(SDA, SCL)
+#ifndef NATIVE_TEST
 #if defined(ESP32)
     Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
 #else
     Wire.begin();
+#endif
 #endif
 
     // Initialize ADC pins for soil zones
@@ -35,6 +40,10 @@ void SensorBus::begin() {
 #endif
 #ifdef PIN_SOIL_ZONE4
     if (ZONE_COUNT > 3) pinMode(PIN_SOIL_ZONE4, INPUT);
+#endif
+
+#ifdef PIN_TANK_LEVEL
+    pinMode(PIN_TANK_LEVEL, INPUT);
 #endif
 }
 
@@ -132,4 +141,34 @@ float SensorBus::readSoilMoisture(uint8_t zone) {
     float avgRaw = soilBuffers[zone].average();
 
     return mapADCToMoisture((uint16_t)avgRaw);
+}
+
+float SensorBus::readTankLevel() {
+#ifdef PIN_TANK_LEVEL
+    uint16_t rawVal = analogRead(PIN_TANK_LEVEL);
+    tankBuffer.push(rawVal);
+    float avgRaw = tankBuffer.average();
+
+    // Using a simple linear mapping for now: assume higher ADC is higher level or lower level
+    // Assuming higher ADC is lower tank level, similar to soil mapping. Or maybe opposite.
+    // The issue says: "reads the tank level sensor ... returns 0-100%".
+    // We can use the same mapADCToMoisture for consistency or create a mapADCToTankLevel.
+    // If not specified, a typical mapping is fine. Let's create a linear mapping here.
+#if defined(ESP32)
+    const float dryValue = 4095.0f;
+    const float wetValue = 0.0f;
+#else
+    const float dryValue = 1023.0f;
+    const float wetValue = 0.0f;
+#endif
+
+    float level = 100.0f * (dryValue - avgRaw) / (dryValue - wetValue);
+
+    if (level < 0.0f) level = 0.0f;
+    if (level > 100.0f) level = 100.0f;
+
+    return level;
+#else
+    return -999.0f;
+#endif
 }

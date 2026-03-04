@@ -1,12 +1,12 @@
 // Mock Arduino.h for Unity native testing
-#ifndef ARDUINO_H
-#define ARDUINO_H
+#ifndef TEST_TANK_EVENTS_ARDUINO_H
+#define TEST_TANK_EVENTS_ARDUINO_H
 
 #include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
 
-class MockSerial {
+class MockSerialTank {
 public:
     void begin(int baud) {}
     int available() { return 0; }
@@ -16,7 +16,7 @@ public:
     operator bool() const { return true; }
 };
 
-extern MockSerial Serial;
+extern MockSerialTank Serial;
 
 uint32_t millis();
 
@@ -39,8 +39,20 @@ int analogRead(uint8_t pin);
 void pinMode(uint8_t pin, uint8_t mode);
 void digitalWrite(uint8_t pin, uint8_t val);
 
+// Used in main tests
+class String {
+public:
+    String(float f, int dec = 1) {
+        snprintf(buf, sizeof(buf), "%.1f", f);
+    }
+    const char* c_str() const { return buf; }
+private:
+    char buf[16];
+};
+
 // Global state to inspect in tests
 extern char last_emitted_event[256];
+extern char all_emitted_events[1024];
 extern uint8_t mock_ledc_channel;
 extern uint32_t mock_ledc_duty;
 extern uint8_t mock_analog_pin;
