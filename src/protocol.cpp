@@ -14,9 +14,9 @@
 #include "../config/Config.h"
 
 // Global driver instance set by main or tests
-static PwmDriver* g_pwmDriver = nullptr;
-static IRelayDriver* g_relayDriver = nullptr;
-static HydraulicWatchdog* g_watchdog = nullptr;
+PwmDriver* protocol_g_pwmDriver = nullptr;
+IRelayDriver* protocol_g_relayDriver = nullptr;
+HydraulicWatchdog* protocol_g_watchdog = nullptr;
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -38,22 +38,22 @@ static void pump_start(const char* params) {
         }
     }
 
-    if (g_relayDriver) {
-        g_relayDriver->setRelay(zone, true);
+    if (protocol_g_relayDriver) {
+        protocol_g_relayDriver->setRelay(zone, true);
     }
-    if (g_watchdog) {
-        g_watchdog->start(zone, millis());
+    if (protocol_g_watchdog) {
+        protocol_g_watchdog->start(zone, millis());
     }
 }
 
 static void pump_stop_all() {
-    if (g_relayDriver) {
+    if (protocol_g_relayDriver) {
         for (uint8_t i = 0; i < ZONE_COUNT; i++) {
-            g_relayDriver->setRelay(i, false);
+            protocol_g_relayDriver->setRelay(i, false);
         }
     }
-    if (g_watchdog) {
-        g_watchdog->stop();
+    if (protocol_g_watchdog) {
+        protocol_g_watchdog->stop();
     }
 }
 
@@ -62,7 +62,7 @@ static void nutrient_dose() {
 }
 
 static void light_set(const char* params) {
-    if (!g_pwmDriver || !params) return;
+    if (!protocol_g_pwmDriver || !params) return;
 
     // Parse ":ch=<n>:pct=<0-100>"
     const char* ch_str = strstr(params, "ch=");
@@ -71,38 +71,38 @@ static void light_set(const char* params) {
     if (ch_str && pct_str) {
         uint8_t ch = atoi(ch_str + 3);
         uint8_t pct = atoi(pct_str + 4);
-        g_pwmDriver->setLedChannel(ch, pct);
+        protocol_g_pwmDriver->setLedChannel(ch, pct);
     }
 }
 
 static void light_legacy_all_on() {
-    if (!g_pwmDriver) return;
+    if (!protocol_g_pwmDriver) return;
     for (uint8_t i = 0; i < 4; i++) {
-        g_pwmDriver->setLedChannel(i, 100);
+        protocol_g_pwmDriver->setLedChannel(i, 100);
     }
 }
 
 static void fan_set(const char* params) {
-    if (!g_pwmDriver || !params) return;
+    if (!protocol_g_pwmDriver || !params) return;
 
     // Parse ":pct=<0-100>"
     const char* pct_str = strstr(params, "pct=");
     if (pct_str) {
         uint8_t pct = atoi(pct_str + 4);
-        g_pwmDriver->setFan(pct);
+        protocol_g_pwmDriver->setFan(pct);
     }
 }
 
 void protocol_set_pwm_driver(PwmDriver* driver) {
-    g_pwmDriver = driver;
+    protocol_g_pwmDriver = driver;
 }
 
 void protocol_set_relay_driver(IRelayDriver* driver) {
-    g_relayDriver = driver;
+    protocol_g_relayDriver = driver;
 }
 
 void protocol_set_watchdog(HydraulicWatchdog* wd) {
-    g_watchdog = wd;
+    protocol_g_watchdog = wd;
 }
 
 static void read_and_emit_sensors() {

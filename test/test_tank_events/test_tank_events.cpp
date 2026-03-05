@@ -8,6 +8,13 @@ void setup();
 void loop();
 
 extern char last_emitted_event[256];
+extern char all_emitted_events[1024];
+
+#define NATIVE_TEST_MOCK_SERIAL_INSTANTIATED
+#include "../../src/main.cpp"
+#include "../../src/protocol.cpp"
+
+// Mock analog variables which are defined in Arduino.cpp
 extern uint8_t mock_analog_pin;
 extern int mock_analog_val;
 extern uint8_t mock_digital_pin;
@@ -70,59 +77,60 @@ int levelToADC(float pct) {
 }
 
 void test_tank_level_above_threshold() {
-    // For test_tank_level_above_threshold, the pump_stopped is set to true somehow.
-    // This is because the default of AveragingBuffer with size 4 is initialized with zeros.
-    // So initial read is 0, which corresponds to 100% tank?
-    // Wait, ADC 0 is 100%. ADC 4095 is 0%.
-    // So if buffer has 0, it's 100%. If it's 100%, it's > 10%. So pump_stopped shouldn't be true.
-    // Why did it fail? Oh! It might be because of other things stopping the pump, or setup() state.
-
-    // Let's reset pump_stopped explicitly before we check.
     pump_stopped = false;
     last_emitted_event[0] = '\0';
 
-    // Fill the buffer
     for(int i=0; i<4; i++) {
-        mock_analog_val = levelToADC(50.0f); // 50% > 10%
+        mock_analog_val = levelToADC(50.0f);
         current_time_ms_pwm += 1000;
-        loop(); // Runs periodic checks
+        loop();
+        // Since heartbeat emits every 1000ms now, it overwrites last_emitted_event
+        // Let's clear it if it's heartbeat
+        if (strncmp(last_emitted_event, "EVT:HEARTBEAT", 13) == 0) {
+            last_emitted_event[0] = '\0';
+        }
     }
 
-    // Pump shouldn't have been stopped in the final poll. Wait, pump_stopped might have been set to true
-    // by something else or an earlier loop if level went to 0. Actually ADC=0 means 100%.
-    // Let's just assert.
     TEST_ASSERT_EQUAL_STRING("", last_emitted_event);
     TEST_ASSERT_FALSE(pump_stopped);
 }
 
 void test_tank_level_drops_below_threshold() {
+    last_emitted_event[0] = '\0';
+    pump_stopped = false;
+
     for(int i=0; i<4; i++) {
-        mock_analog_val = levelToADC(5.0f); // 5% < 10%
+        mock_analog_val = levelToADC(5.0f);
         current_time_ms_pwm += 1000;
         loop();
+        // We expect EVT:TANK_EMPTY to be emitted when it drops below
+        if (strncmp(last_emitted_event, "EVT:HEARTBEAT", 13) == 0) {
+            // Heartbeat overwrote our TANK_EMPTY event if TANK_EMPTY was emitted first
+            // To fix this, let's look at all_emitted_events
+        }
     }
 
-    TEST_ASSERT_EQUAL_STRING("EVT:TANK_EMPTY:level_pct=5", last_emitted_event);
+    TEST_ASSERT_NOT_NULL(strstr(all_emitted_events, "EVT:TANK_EMPTY:level_pct=5"));
     TEST_ASSERT_TRUE(pump_stopped);
 }
 
 void test_tank_level_stays_below_threshold() {
     mock_analog_val = levelToADC(5.0f);
 
-    current_time_ms_pwm = 1000;
+    current_time_ms_pwm += 1000;
     loop(); // Emits EVT:TANK_EMPTY
 
     // Clear string
     last_emitted_event[0] = '\0';
+    all_emitted_events[0] = '\0';
     pump_stopped = false;
 
     // Next poll
-    current_time_ms_pwm = 2000;
+    current_time_ms_pwm += 1000;
     mock_analog_val = levelToADC(4.0f);
     loop(); // Still below, guard prevents emit
 
-    TEST_ASSERT_EQUAL_STRING("", last_emitted_event);
-    // Note: the loop does not stop pumps again since it doesn't enter the guard block
+    TEST_ASSERT_NULL(strstr(all_emitted_events, "EVT:TANK_EMPTY"));
 }
 
 void test_tank_level_rises_and_drops() {
@@ -130,27 +138,28 @@ void test_tank_level_rises_and_drops() {
     for(int i=0; i<4; i++) {
         mock_analog_val = levelToADC(5.0f);
         current_time_ms_pwm += 1000;
-        loop(); // Emits EVT:TANK_EMPTY
+        loop();
     }
 
     // Rise
     for(int i=0; i<4; i++) {
         mock_analog_val = levelToADC(50.0f);
         current_time_ms_pwm += 1000;
-        loop(); // Guard resets
+        loop();
     }
 
     last_emitted_event[0] = '\0';
+    all_emitted_events[0] = '\0';
     pump_stopped = false;
 
     // Drop again
     for(int i=0; i<4; i++) {
         mock_analog_val = levelToADC(8.0f);
         current_time_ms_pwm += 1000;
-        loop(); // Emits EVT:TANK_EMPTY again
+        loop();
     }
 
-    TEST_ASSERT_EQUAL_STRING("EVT:TANK_EMPTY:level_pct=8", last_emitted_event);
+    TEST_ASSERT_NOT_NULL(strstr(all_emitted_events, "EVT:TANK_EMPTY:level_pct=8"));
     TEST_ASSERT_TRUE(pump_stopped);
 }
 

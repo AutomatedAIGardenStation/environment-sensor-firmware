@@ -6,6 +6,9 @@
 #include <stddef.h>
 #include <stdio.h>
 
+#ifndef NATIVE_TEST_MOCK_SERIAL
+#define NATIVE_TEST_MOCK_SERIAL
+
 class MockSerial {
 public:
     void begin(int baud) {}
@@ -17,6 +20,8 @@ public:
 };
 
 extern MockSerial Serial;
+
+#endif // NATIVE_TEST_MOCK_SERIAL
 
 uint32_t millis();
 
