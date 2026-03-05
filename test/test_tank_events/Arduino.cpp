@@ -3,6 +3,8 @@
 
 MockSerialTank Serial;
 
+uint32_t millis();
+
 // Global buffer for last event printed to Serial
 char last_emitted_event[256];
 char all_emitted_events[1024];

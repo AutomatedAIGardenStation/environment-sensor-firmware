@@ -21,9 +21,12 @@ pio run -e nanoatmega328 -t upload
 
 # Monitor serial output
 pio device monitor -b 115200
+
+# Run native unit tests
+pio test -e native
 ```
 
-Available environments: `nanoatmega328`, `uno`, `esp32dev`
+Available environments: `nanoatmega328`, `uno`, `esp32dev`, `native`
 
 ---
 
@@ -34,10 +37,16 @@ env_controller/
 ├── platformio.ini      # PlatformIO environments for supported boards
 ├── config/
 │   └── Config.h        # Board-specific pin assignments and global constants
-└── src/
-    ├── main.cpp        # Setup / loop, Serial reader, heartbeat, sensor polling
-    ├── protocol.h      # Command & event constants, public API
-    └── protocol.cpp    # Command dispatcher – stub HAL calls to replace
+├── lib/
+│   ├── actuators/      # Actuator HAL (PwmDriver, RelayDriver)
+│   ├── events/         # Event dispatch and guards
+│   ├── scheduler/      # Polling engine and timed tasks
+│   └── sensors/        # Sensor bus and HAL
+├── src/
+│   ├── main.cpp        # Setup / loop, Serial reader, heartbeat, sensor polling
+│   ├── protocol.h      # Command & event constants, public API
+│   └── protocol.cpp    # Command dispatcher
+└── test/               # Unity test suites (run with pio test -e native)
 ```
 
 ---
@@ -49,9 +58,29 @@ env_controller/
 | Backend → Controller | `<COMMAND>[:<key>=<val>]*\n` |
 | Controller → Backend | `EVT:<NAME>[:<key>=<val>]*\n` |
 
-**Key commands:** `WATER_START:zone=<id>`, `WATER_STOP`, `F1` (feed), `LIGHT_SET:ch=<n>:pct=<0-100>`, `FAN_SET:pct=<0-100>`, `SENSOR_READ`
+### Commands
 
-**Key events:** `EVT:WATER_DONE`, `EVT:TANK_LOW:level_pct=<n>`, `EVT:TANK_EMPTY:level_pct=<n>`, `EVT:PUMP_OVERCURRENT:amps=<n>`, `EVT:SENSOR_DATA:temp=<n>:hum=<n>:ph=<n>:ec=<n>:level=<n>`, `EVT:HEARTBEAT:status=OK`
+| Command | Parameters | Description |
+|---|---|---|
+| `WATER_START` | `zone=<id>` (0-3) | Starts a water pump for a specific zone. |
+| `WATER_STOP` | (none) | Stops all active pumps immediately. |
+| `W1` | (none) | Starts pump for zone 0. (Legacy command) |
+| `FEED` or `F1` | (none) | Triggers a quick nutrient dose. |
+| `LIGHT_SET` | `ch=<id>` (0-3), `pct=<0-100>` | Sets PWM intensity for an LED channel. |
+| `L1` | (none) | Sets all 4 LED channels to 100%. (Legacy command) |
+| `FAN_SET` | `pct=<0-100>` | Sets PWM intensity for the fan. |
+| `SENSOR_READ` | (none) | Emits current sensor readings immediately. |
+
+### Events
+
+| Event | Parameters | Description |
+|---|---|---|
+| `EVT:BOOT` | `fw=<name>`, `v=<ver>` | Emitted once on firmware startup. |
+| `EVT:HEARTBEAT` | `status=OK`, `T=<temp>`, `H=<hum>`, `soil=<avg>`, `tank=<lvl>` | Periodic health status and sensor summary (every 1 s). |
+| `EVT:SENSOR_DATA` | `temp=<n>`, `hum=<n>`, `ph=<n>`, `ec=<n>`, `level=<n>` | Full sensor dump (polled every 5 s or on demand). |
+| `EVT:TANK_EMPTY` | `level_pct=<n>` | Critical alert when tank drops below 10%. Auto-stops pumps. |
+| `EVT:PUMP_OVERCURRENT` | `amps=<n>` | Hard safety timeout reached for a pump, auto-stopping it. |
+| `EVT:WATER_DONE` | (none) | Emitted when a watering cycle completes successfully. |
 
 ---
 

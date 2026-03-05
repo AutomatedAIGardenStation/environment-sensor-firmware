@@ -8,6 +8,8 @@
 uint32_t millis() {
     return 0;
 }
+void loop() {}
+void setup() {}
 
 void setUp(void) {
     // set stuff up here

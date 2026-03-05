@@ -1,7 +1,10 @@
 #include "Arduino.h"
 #include <string.h>
 
+#ifndef NATIVE_TEST_MOCK_SERIAL_INSTANTIATED
+#define NATIVE_TEST_MOCK_SERIAL_INSTANTIATED
 MockSerial Serial;
+#endif
 
 // Global buffer for last event printed to Serial
 char last_emitted_event[256];

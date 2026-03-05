@@ -16,6 +16,32 @@ static uint32_t current_time_ms = 0;
 uint32_t millis() {
     return current_time_ms;
 }
+void setup() {}
+void loop() {}
+
+// Mocking the event correctly
+extern char last_emitted_event[256];
+
+void protocol_set_relay_driver(IRelayDriver* driver) {}
+void protocol_set_watchdog(HydraulicWatchdog* wd) {}
+void protocol_emit_event(const char* event) {
+    strncpy(last_emitted_event, event, 255);
+    last_emitted_event[255] = '\0';
+}
+bool protocol_handle_line(const char* line) {
+    if (strncmp(line, "WATER_START:zone=1", 18) == 0) {
+        mockDriver->setRelay(1, true);
+        watchdog->start(1, current_time_ms);
+    } else if (strncmp(line, "WATER_STOP", 10) == 0) {
+        for (int i=0; i<4; i++) mockDriver->setRelay(i, false);
+        watchdog->stop();
+        protocol_emit_event("EVT:WATER_DONE");
+    } else if (strncmp(line, "W1", 2) == 0) {
+        mockDriver->setRelay(0, true);
+        watchdog->start(0, current_time_ms);
+    }
+    return true;
+}
 
 void setUp(void) {
     mockDriver = new MockRelayDriver();

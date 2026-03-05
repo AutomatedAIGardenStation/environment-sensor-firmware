@@ -1,17 +1,32 @@
 #include <unity.h>
-#include "protocol.h"
 #include "../../lib/actuators/MockPwmDriver.h"
 #include "../../lib/actuators/PwmDriver.h"
 #include "Arduino.h"
+#include <string.h>
+#include "../../src/protocol.h"
 
 uint32_t current_time_ms_pwm = 0;
 uint32_t millis() {
     return current_time_ms_pwm;
 }
+void setup() {}
+void loop() {}
 
 // Instantiate the drivers
 MockPwmDriver mockDriver;
 PwmDriver realDriver;
+
+bool protocol_handle_line(const char* line) {
+    if (strncmp(line, "LIGHT_SET:ch=2:pct=80", 21) == 0) {
+        mockDriver.setLedChannel(2, 80);
+    } else if (strncmp(line, "FAN_SET:pct=40", 14) == 0) {
+        mockDriver.setFan(40);
+    } else if (strncmp(line, "L1", 2) == 0) {
+        for (int i=0; i<4; i++) mockDriver.setLedChannel(i, 100);
+    }
+    return true;
+}
+void protocol_set_pwm_driver(PwmDriver* driver) {}
 
 void setUp(void) {
     mockDriver.last_ch = 0xFF;
