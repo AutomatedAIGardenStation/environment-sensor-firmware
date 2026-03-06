@@ -235,7 +235,7 @@ bool protocol_handle_line(const char* line) {
 
     // include the colon before CRC=
     size_t payload_len = (crc_ptr - buf) + 1;
-    uint8_t calculated_crc = crc8((const uint8_t*)line, payload_len);
+    uint8_t calculated_crc = crc8(reinterpret_cast<const uint8_t*>(line), payload_len);
 
     const char* crc_hex_str = crc_ptr + 5;
     char hex_buf[3] = {0};
@@ -351,13 +351,16 @@ void protocol_net_loop() {
     if (g_eventQueue) {
         char buf[EVENT_QUEUE_ITEM_SIZE];
         while (xQueueReceive(g_eventQueue, buf, 0) == pdTRUE) {
-            if (isConnected) {
 #if defined(HAS_PUBSUB)
+            if (isConnected) {
                 mqttClient.publish(MQTT_TOPIC_TELEMETRY, buf);
-#endif
             } else {
                 Serial.println(buf); // Fallback
             }
+#else
+            (void)isConnected; // Prevent unused variable warning
+            Serial.println(buf); // Fallback
+#endif
         }
     }
 #endif

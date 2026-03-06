@@ -32,7 +32,7 @@ void test_valid_command_pump_run(void) {
     // 0123:PUMP_RUN:ms=500:
     // crc8 of "0123:PUMP_RUN:ms=500:"
     const char* str_to_crc = "0123:PUMP_RUN:ms=500:";
-    uint8_t expected_crc = crc8((const uint8_t*)str_to_crc, strlen(str_to_crc));
+    uint8_t expected_crc = crc8(reinterpret_cast<const uint8_t*>(str_to_crc), strlen(str_to_crc));
 
     char buf[128];
     snprintf(buf, sizeof(buf), "0123:PUMP_RUN:ms=500:CRC=%02X", expected_crc);
@@ -52,7 +52,7 @@ void test_invalid_crc(void) {
 
 void test_unknown_command(void) {
     const char* str_to_crc = "1111:FAKE_CMD:";
-    uint8_t expected_crc = crc8((const uint8_t*)str_to_crc, strlen(str_to_crc));
+    uint8_t expected_crc = crc8(reinterpret_cast<const uint8_t*>(str_to_crc), strlen(str_to_crc));
 
     char buf[128];
     snprintf(buf, sizeof(buf), "1111:FAKE_CMD:CRC=%02X", expected_crc);

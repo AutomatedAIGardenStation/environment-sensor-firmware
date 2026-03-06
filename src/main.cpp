@@ -160,9 +160,13 @@ void loop() {
     uint32_t now = millis();
 
     // ── Read Serial ──────────────────────────────────────────────────────────
+#if !defined(NATIVE_TEST)
+    // cppcheck-suppress knownConditionTrueFalse
     while (Serial.available()) {
+        // cppcheck-suppress knownConditionTrueFalse
         char c = (char)Serial.read();
         g_last_rx_ms = now; // Update PING watchdog
+        // cppcheck-suppress knownConditionTrueFalse
         if (c == '\n' || c == '\r') {
             if (g_line_len > 0) {
                 g_line_buf[g_line_len] = '\0';
@@ -174,6 +178,7 @@ void loop() {
         }
         // Silently drop bytes when buffer is full
     }
+#endif
 
     // PING Watchdog (10s silence)
     if (now - g_last_rx_ms > 10000UL) {
@@ -195,6 +200,8 @@ void loop() {
 #else
     // On AVR/native, they run here in the main loop
     g_pollingEngine.tick(now);
+#if !defined(NATIVE_TEST)
     protocol_net_loop();
+#endif
 #endif
 }
