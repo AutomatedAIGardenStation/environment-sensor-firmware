@@ -275,7 +275,9 @@ void protocol_net_begin() {
 
 void protocol_net_loop() {
 #if defined(ESP32) && !defined(NATIVE_TEST)
+#if defined(HAS_PUBSUB)
     bool isConnected = false;
+#endif
 
     if (WiFi.status() == WL_CONNECTED) {
 #if defined(HAS_PUBSUB)
@@ -294,13 +296,15 @@ void protocol_net_loop() {
     if (g_eventQueue) {
         char buf[EVENT_QUEUE_ITEM_SIZE];
         while (xQueueReceive(g_eventQueue, buf, 0) == pdTRUE) {
-            if (isConnected) {
 #if defined(HAS_PUBSUB)
+            if (isConnected) {
                 mqttClient.publish(MQTT_TOPIC_TELEMETRY, buf);
-#endif
             } else {
                 Serial.println(buf); // Fallback
             }
+#else
+            Serial.println(buf); // Fallback if no pubsub
+#endif
         }
     }
 #endif
