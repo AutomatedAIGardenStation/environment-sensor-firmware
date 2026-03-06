@@ -100,6 +100,19 @@ void task_tank_level() {
     }
 }
 
+#if defined(ESP32) && !defined(NATIVE_TEST)
+void core0_task(void *pvParameters) {
+    while (true) {
+        uint32_t now = millis();
+        // Currently the polling engine tasks log data directly,
+        // which now goes into the queue.
+        g_pollingEngine.tick(now);
+        protocol_net_loop();
+        vTaskDelay(10 / portTICK_PERIOD_MS);
+    }
+}
+#endif
+
 void setup() {
     Serial.begin(SERIAL_BAUD);
     while (!Serial) { /* wait for USB-serial on native-USB boards */ }
@@ -129,6 +142,18 @@ void setup() {
     protocol_net_begin();
 
     g_last_rx_ms = millis();
+
+#if defined(ESP32) && !defined(NATIVE_TEST)
+    xTaskCreatePinnedToCore(
+        core0_task,     // Function to implement the task
+        "core0_task",   // Name of the task
+        4096,           // Stack size in words
+        NULL,           // Task input parameter
+        1,              // Priority of the task
+        NULL,           // Task handle
+        0               // Core where the task should run
+    );
+#endif
 }
 
 void loop() {
@@ -164,7 +189,12 @@ void loop() {
 
     g_watchdog.tick(now);
     g_doser.tick(now);
-    g_pollingEngine.tick(now);
 
+#if defined(ESP32) && !defined(NATIVE_TEST)
+    // On ESP32, polling engine and network loop run on Core 0
+#else
+    // On AVR/native, they run here in the main loop
+    g_pollingEngine.tick(now);
     protocol_net_loop();
+#endif
 }

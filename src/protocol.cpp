@@ -17,6 +17,8 @@
 // Wi-Fi and MQTT logic for ESP32
 #if defined(ESP32) && !defined(NATIVE_TEST)
 #include <WiFi.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
 // Since PubSubClient.h might be missing in some CI runs or library scopes
 // without modifying global libdeps, we conditionally declare it.
 #if __has_include(<PubSubClient.h>)
@@ -25,6 +27,11 @@ static WiFiClient espClient;
 static PubSubClient mqttClient(espClient);
 #define HAS_PUBSUB
 #endif
+
+#define EVENT_QUEUE_LENGTH 20
+#define EVENT_QUEUE_ITEM_SIZE 128
+static QueueHandle_t g_eventQueue = nullptr;
+
 #endif
 
 // Global driver instance set by main or tests
@@ -240,11 +247,16 @@ bool protocol_handle_line(const char* line) {
 }
 
 void protocol_emit_event(const char* event) {
-#if defined(ESP32) && !defined(NATIVE_TEST) && defined(HAS_PUBSUB)
-    if (mqttClient.connected()) {
-        mqttClient.publish(MQTT_TOPIC_TELEMETRY, event);
+#if defined(ESP32) && !defined(NATIVE_TEST)
+    if (g_eventQueue) {
+        char buf[EVENT_QUEUE_ITEM_SIZE];
+        strncpy(buf, event, sizeof(buf) - 1);
+        buf[sizeof(buf) - 1] = '\0';
+        if (xQueueSend(g_eventQueue, buf, 0) != pdTRUE) {
+            Serial.println("ERR:QUEUE_FULL");
+        }
     } else {
-        Serial.println(event); // Fallback to serial if not connected
+        Serial.println(event);
     }
 #else
     Serial.println(event);
@@ -253,6 +265,7 @@ void protocol_emit_event(const char* event) {
 
 void protocol_net_begin() {
 #if defined(ESP32) && !defined(NATIVE_TEST)
+    g_eventQueue = xQueueCreate(EVENT_QUEUE_LENGTH, EVENT_QUEUE_ITEM_SIZE);
     WiFi.begin(WIFI_SSID, WIFI_PASS);
 #if defined(HAS_PUBSUB)
     mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
@@ -262,6 +275,8 @@ void protocol_net_begin() {
 
 void protocol_net_loop() {
 #if defined(ESP32) && !defined(NATIVE_TEST)
+    bool isConnected = false;
+
     if (WiFi.status() == WL_CONNECTED) {
 #if defined(HAS_PUBSUB)
         if (!mqttClient.connected()) {
@@ -271,8 +286,22 @@ void protocol_net_loop() {
         }
         if (mqttClient.connected()) {
             mqttClient.loop();
+            isConnected = true;
         }
 #endif
+    }
+
+    if (g_eventQueue) {
+        char buf[EVENT_QUEUE_ITEM_SIZE];
+        while (xQueueReceive(g_eventQueue, buf, 0) == pdTRUE) {
+            if (isConnected) {
+#if defined(HAS_PUBSUB)
+                mqttClient.publish(MQTT_TOPIC_TELEMETRY, buf);
+#endif
+            } else {
+                Serial.println(buf); // Fallback
+            }
+        }
     }
 #endif
 }
