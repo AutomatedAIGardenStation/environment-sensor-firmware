@@ -7,17 +7,23 @@
 
 class MockRelayDriver : public IRelayDriver {
 public:
-    bool pump_states[ZONE_COUNT];
+    bool main_pump_state;
+    bool valve_states[VALVE_COUNT];
 
     MockRelayDriver() {
-        for (uint8_t i = 0; i < ZONE_COUNT; i++) {
-            pump_states[i] = false;
+        main_pump_state = false;
+        for (uint8_t i = 0; i < VALVE_COUNT; i++) {
+            valve_states[i] = false;
         }
     }
 
-    void setRelay(uint8_t zone, bool on) override {
-        if (zone < ZONE_COUNT) {
-            pump_states[zone] = on;
+    void setMainPump(bool on) override {
+        main_pump_state = on;
+    }
+
+    void setValve(uint8_t valveId, bool on) override {
+        if (valveId < VALVE_COUNT) {
+            valve_states[valveId] = on;
         }
     }
 };

@@ -11,11 +11,9 @@ public:
 
     void begin();
 
-    // Specific to RelayDriver
-    void setPump(uint8_t zone, bool on);
-
     // IRelayDriver implementation
-    void setRelay(uint8_t zone, bool on) override;
+    void setMainPump(bool on) override;
+    void setValve(uint8_t valveId, bool on) override;
 };
 
 #endif // RELAY_DRIVER_H

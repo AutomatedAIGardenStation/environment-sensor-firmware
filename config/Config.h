@@ -12,7 +12,7 @@
 // ── Global Configuration ──────────────────────────────────────────────────
 #define MAX_PUMP_TIME_MS          30000 // 30 seconds, hard watchdog limit
 #define TANK_EMPTY_THRESHOLD_PCT  10    // percent below which EVT:TANK_EMPTY fires
-#define ZONE_COUNT                4     // number of independently controllable water zones
+#define VALVE_COUNT               5     // number of independently controllable valves
 #define LED_CHANNEL_COUNT         4     // number of LED PWM channels
 #define PWM_FREQ                  1000  // 1000 Hz PWM frequency
 #define PWM_RESOLUTION            13    // 13-bit PWM resolution
@@ -20,15 +20,12 @@
 #if defined(ARDUINO_AVR_NANO) || defined(ARDUINO_AVR_UNO)
   // ── Arduino Nano / Uno (ATmega328P) ────────────────────────────────────
   // Relay outputs (active LOW – relay module pulled to GND by default)
-  #define PIN_PUMP_ZONE1   2
-  #define PIN_PUMP_ZONE2   3
-  #define PIN_PUMP_ZONE3   4
-  #define PIN_PUMP_ZONE4   5
-  #define PIN_VALVE_ZONE1  6
-  #define PIN_VALVE_ZONE2  7
-  #define PIN_VALVE_ZONE3  8
-  #define PIN_VALVE_ZONE4  12
-  #define PIN_NUTRIENT_PUMP 13
+  #define PIN_MAIN_PUMP    2
+  #define PIN_VALVE_NUT_A  3
+  #define PIN_VALVE_NUT_B  4
+  #define PIN_VALVE_PH_UP  5
+  #define PIN_VALVE_PH_DOWN 6
+  #define PIN_VALVE_CO2    7
 
   // PWM outputs
   #define PIN_LED_CH1      9
@@ -42,11 +39,6 @@
   #define PIN_EC_SENSOR    A1
   #define PIN_TANK_LEVEL   A4
 
-  // Soil Moisture ADCs
-  #define PIN_SOIL_ZONE1   A6
-  #define PIN_SOIL_ZONE2   A7
-  #define PIN_SOIL_ZONE3   A5
-  #define PIN_SOIL_ZONE4   1
 
   // Digital / I2C sensors
   #define PIN_I2C_SDA      A4
@@ -56,17 +48,12 @@
 
 #elif defined(ARDUINO_ESP32_DEV) || defined(ENV_CONTROLLER) || defined(ESP32)
   // ── ESP32 DevKit ────────────────────────────────────────────────────────
-  #define PIN_PUMP_ZONE1    4
-  #define PIN_PUMP_ZONE2    5
-  #define PIN_PUMP_ZONE3    12
-  #define PIN_PUMP_ZONE4    13
-
-  #define PIN_VALVE_ZONE1   14
-  #define PIN_VALVE_ZONE2   15
-  #define PIN_VALVE_ZONE3   16
-  #define PIN_VALVE_ZONE4   17
-
-  #define PIN_NUTRIENT_PUMP 18
+  #define PIN_MAIN_PUMP     4
+  #define PIN_VALVE_NUT_A   5
+  #define PIN_VALVE_NUT_B   12
+  #define PIN_VALVE_PH_UP   13
+  #define PIN_VALVE_PH_DOWN 14
+  #define PIN_VALVE_CO2     15
 
   #define PIN_LED_CH1       19
   #define PIN_LED_CH2       21
@@ -79,13 +66,16 @@
   #define PIN_EC_SENSOR     35   // Input-only ADC
   #define PIN_TANK_LEVEL    36   // Input-only ADC
 
-  #define PIN_SOIL_ZONE1    39   // Input-only ADC
-  #define PIN_SOIL_ZONE2    32
-  #define PIN_SOIL_ZONE3    33
-  #define PIN_SOIL_ZONE4    26
 
   #define PIN_I2C_SDA       27
   #define PIN_I2C_SCL       0
+
+  // ── Wi-Fi & MQTT (ESP32 only) ───────────────────────────────────────────
+  #define WIFI_SSID         "GARDEN_WIFI"
+  #define WIFI_PASS         "secret123"
+  #define MQTT_SERVER       "192.168.1.100"
+  #define MQTT_PORT         1883
+  #define MQTT_TOPIC_TELEMETRY "garden/env/telemetry"
 
   #define PIN_DHT22         2
 

@@ -27,19 +27,11 @@ void SensorBus::begin() {
 #endif
 #endif
 
-    // Initialize ADC pins for soil zones
-    // The exact pins are defined in Config.h, we map them here
-#ifdef PIN_SOIL_ZONE1
-    if (ZONE_COUNT > 0) pinMode(PIN_SOIL_ZONE1, INPUT);
+#ifdef PIN_EC_SENSOR
+    pinMode(PIN_EC_SENSOR, INPUT);
 #endif
-#ifdef PIN_SOIL_ZONE2
-    if (ZONE_COUNT > 1) pinMode(PIN_SOIL_ZONE2, INPUT);
-#endif
-#ifdef PIN_SOIL_ZONE3
-    if (ZONE_COUNT > 2) pinMode(PIN_SOIL_ZONE3, INPUT);
-#endif
-#ifdef PIN_SOIL_ZONE4
-    if (ZONE_COUNT > 3) pinMode(PIN_SOIL_ZONE4, INPUT);
+#ifdef PIN_PH_SENSOR
+    pinMode(PIN_PH_SENSOR, INPUT);
 #endif
 
 #ifdef PIN_TANK_LEVEL
@@ -64,83 +56,34 @@ float SensorBus::readHumidity() {
     return -999.0f;
 }
 
-uint16_t SensorBus::readRawSoilADC(uint8_t zone) {
-    switch (zone) {
-        case 0:
-#ifdef PIN_SOIL_ZONE1
-            return analogRead(PIN_SOIL_ZONE1);
-#else
-            return 0;
-#endif
-        case 1:
-#ifdef PIN_SOIL_ZONE2
-            return analogRead(PIN_SOIL_ZONE2);
-#else
-            return 0;
-#endif
-        case 2:
-#ifdef PIN_SOIL_ZONE3
-            return analogRead(PIN_SOIL_ZONE3);
-#else
-            return 0;
-#endif
-        case 3:
-#ifdef PIN_SOIL_ZONE4
-            return analogRead(PIN_SOIL_ZONE4);
-#else
-            return 0;
-#endif
-        default:
-            return 0;
-    }
+float SensorBus::mapADCToEC(uint16_t adcValue) {
+    // Placeholder linear map for EC
+    return (float)adcValue * (5.0f / 4095.0f);
 }
 
-float SensorBus::mapADCToMoisture(uint16_t adcValue) {
-    // This is a placeholder mapping function.
-    // In reality, this requires calibration values for dry/wet soil.
-    // For now, let's assume a generic 10-bit ADC (0-1023) mapping where
-    // 1023 is dry and 0 is wet (capacitive soil moisture sensors often invert).
-    // If it's a 12-bit ADC (ESP32, 0-4095), this would differ.
-
-    // We'll normalize dynamically based on a generic range, but since actual
-    // mapping depends on hardware, we'll do a simple conversion.
-    // For capacitive sensors, typically lower value = wetter.
-
-    // Let's use standard Arduino map function over 0-1023 for atmega
-    // or 0-4095 for esp32. We can try to handle both generic cases,
-    // or just return the ADC value mapped to 0-100%.
-
-    // Assuming higher ADC is drier, lower ADC is wetter.
-#if defined(ESP32)
-    // 12-bit ADC
-    const float dryValue = 4095.0f;
-    const float wetValue = 0.0f;
-#else
-    // 10-bit ADC
-    const float dryValue = 1023.0f;
-    const float wetValue = 0.0f;
-#endif
-
-    float moisture = 100.0f * (dryValue - (float)adcValue) / (dryValue - wetValue);
-
-    // Constrain to 0-100
-    if (moisture < 0.0f) moisture = 0.0f;
-    if (moisture > 100.0f) moisture = 100.0f;
-
-    return moisture;
+float SensorBus::mapADCToPH(uint16_t adcValue) {
+    // Placeholder linear map for pH
+    return (float)adcValue * (14.0f / 4095.0f);
 }
 
-float SensorBus::readSoilMoisture(uint8_t zone) {
-    if (zone >= ZONE_COUNT) {
-        return -999.0f;
-    }
+float SensorBus::readEC() {
+#ifdef PIN_EC_SENSOR
+    uint16_t rawVal = analogRead(PIN_EC_SENSOR);
+    ecBuffer.push(rawVal);
+    return mapADCToEC((uint16_t)ecBuffer.average());
+#else
+    return -999.0f;
+#endif
+}
 
-    uint16_t rawVal = readRawSoilADC(zone);
-    soilBuffers[zone].push(rawVal);
-
-    float avgRaw = soilBuffers[zone].average();
-
-    return mapADCToMoisture((uint16_t)avgRaw);
+float SensorBus::readPH() {
+#ifdef PIN_PH_SENSOR
+    uint16_t rawVal = analogRead(PIN_PH_SENSOR);
+    phBuffer.push(rawVal);
+    return mapADCToPH((uint16_t)phBuffer.average());
+#else
+    return -999.0f;
+#endif
 }
 
 float SensorBus::readTankLevel() {

@@ -15,6 +15,7 @@
 #include "../lib/actuators/PwmDriver.h"
 #include "../lib/actuators/RelayDriver.h"
 #include "../lib/actuators/HydraulicWatchdog.h"
+#include "../lib/actuators/Doser.h"
 #include "../lib/sensors/SensorBus.h"
 #include "../lib/events/EventGuard.h"
 #include "../lib/scheduler/PollingEngine.h"
@@ -24,51 +25,62 @@
 #define SERIAL_BAUD      115200
 #define LINE_BUF_SIZE    128
 #define HEARTBEAT_MS     1000UL    // heartbeat to backend every 1 s
-#define SENSOR_POLL_MS   5000UL    // push standard sensor data every 5 s
 #define TANK_POLL_MS     1000UL    // check critical tank level every 1 s
+#define SENSOR_POLL_MS   30000UL   // 30 seconds for sensor data
 
 static char     g_line_buf[LINE_BUF_SIZE];
 static uint8_t  g_line_len       = 0;
 
+static uint32_t g_last_rx_ms     = 0;
+
 PwmDriver g_pwmDriver;
 RelayDriver g_relayDriver;
 HydraulicWatchdog g_watchdog(&g_relayDriver);
+Doser g_doser(&g_relayDriver);
+
 static SensorBus g_sensorBus;
 static TankEmptyGuard g_tankEmptyGuard;
 static PollingEngine g_pollingEngine;
 
 void task_heartbeat() {
-    float t = g_sensorBus.readTemperature();
-    float h = g_sensorBus.readHumidity();
-    float tank = g_sensorBus.readTankLevel();
-
-    float soil_sum = 0.0f;
-    int valid_soil_count = 0;
-    for (int i = 0; i < ZONE_COUNT; i++) {
-        float s = g_sensorBus.readSoilMoisture(i);
-        if (s != -999.0f) {
-            soil_sum += s;
-            valid_soil_count++;
-        }
-    }
-    float soil_avg = valid_soil_count > 0 ? (soil_sum / valid_soil_count) : -999.0f;
-
-    char t_str[10], h_str[10], soil_str[10], tank_str[10];
-
-    if (t == -999.0f) strcpy(t_str, "-"); else snprintf(t_str, sizeof(t_str), "%.1f", t);
-    if (h == -999.0f) strcpy(h_str, "-"); else snprintf(h_str, sizeof(h_str), "%.1f", h);
-    if (soil_avg == -999.0f) strcpy(soil_str, "-"); else snprintf(soil_str, sizeof(soil_str), "%.1f", soil_avg);
-    if (tank == -999.0f) strcpy(tank_str, "-"); else snprintf(tank_str, sizeof(tank_str), "%.1f", tank);
-
-    char hb_buf[128];
-    snprintf(hb_buf, sizeof(hb_buf), "EVT:HEARTBEAT:status=OK:T=%s:H=%s:soil=%s:tank=%s", t_str, h_str, soil_str, tank_str);
-
+    char hb_buf[64];
+    snprintf(hb_buf, sizeof(hb_buf), "EVT:HEARTBEAT:status=OK");
     protocol_emit_event(hb_buf);
 }
 
 void task_sensors() {
-    // TODO: replace with real read – see protocol.cpp read_and_emit_sensors()
-    protocol_handle_line("SENSOR_READ");
+    float t = g_sensorBus.readTemperature();
+    float h = g_sensorBus.readHumidity();
+    float ec = g_sensorBus.readEC();
+    float ph = g_sensorBus.readPH();
+
+    char buf[128];
+
+    if (t != -999.0f) {
+        snprintf(buf, sizeof(buf), "EVT:AIR_TEMP:temp=%.1f", t);
+        protocol_emit_event(buf);
+    }
+    if (h != -999.0f) {
+        snprintf(buf, sizeof(buf), "EVT:AIR_HUMIDITY:humidity=%.1f", h);
+        protocol_emit_event(buf);
+    }
+    if (ec != -999.0f || ph != -999.0f || t != -999.0f) {
+        // We use water_temp=0 for now or same as air_temp depending on design.
+        // Let's use air temp for now, or just leave it empty.
+        snprintf(buf, sizeof(buf), "EVT:SENSOR_UPDATE:ec=%.2f:ph=%.2f:water_temp=%.1f",
+                 (ec != -999.0f ? ec : 0.0), (ph != -999.0f ? ph : 0.0), (t != -999.0f ? t : 0.0));
+        protocol_emit_event(buf);
+
+        // Check thresholds and emit
+        if (ec != -999.0f) {
+            if (ec < 1.0f) protocol_emit_event("EVT:EC_LOW"); // Placeholder thresholds
+            else if (ec > 3.0f) protocol_emit_event("EVT:EC_HIGH");
+        }
+        if (ph != -999.0f) {
+            if (ph < 5.5f) protocol_emit_event("EVT:PH_LOW");
+            else if (ph > 6.5f) protocol_emit_event("EVT:PH_HIGH");
+        }
+    }
 }
 
 void task_tank_level() {
@@ -82,9 +94,7 @@ void task_tank_level() {
             protocol_emit_event(evt_buf);
 
             // Immediate pump stop
-            for (uint8_t i = 0; i < ZONE_COUNT; i++) {
-                g_relayDriver.setPump(i, false);
-            }
+            g_relayDriver.setMainPump(false);
             g_watchdog.stop();
         }
     }
@@ -111,16 +121,23 @@ void setup() {
     g_relayDriver.begin();
     protocol_set_relay_driver(&g_relayDriver);
     protocol_set_watchdog(&g_watchdog);
+    protocol_set_doser(&g_doser);
 
     g_sensorBus.begin();
 
     protocol_emit_event("EVT:BOOT:fw=env_controller:v=0.1.0");
+    protocol_net_begin();
+
+    g_last_rx_ms = millis();
 }
 
 void loop() {
+    uint32_t now = millis();
+
     // ── Read Serial ──────────────────────────────────────────────────────────
     while (Serial.available()) {
         char c = (char)Serial.read();
+        g_last_rx_ms = now; // Update PING watchdog
         if (c == '\n' || c == '\r') {
             if (g_line_len > 0) {
                 g_line_buf[g_line_len] = '\0';
@@ -133,10 +150,21 @@ void loop() {
         // Silently drop bytes when buffer is full
     }
 
-    uint32_t now = millis();
+    // PING Watchdog (10s silence)
+    if (now - g_last_rx_ms > 10000UL) {
+        g_relayDriver.setMainPump(false);
+        for (uint8_t i = 0; i < VALVE_COUNT; i++) {
+            g_relayDriver.setValve(i, false);
+        }
+        g_watchdog.stop();
+        g_doser.stop();
+        g_last_rx_ms = now; // Prevent repeating
+        protocol_emit_event("EVT:PING_TIMEOUT");
+    }
 
     g_watchdog.tick(now);
+    g_doser.tick(now);
     g_pollingEngine.tick(now);
 
-    // TODO: check overcurrent threshold and emit EVT_PUMP_OVERCURRENT
+    protocol_net_loop();
 }
