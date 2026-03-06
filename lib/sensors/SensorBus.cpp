@@ -56,12 +56,12 @@ float SensorBus::readHumidity() {
     return -999.0f;
 }
 
-float SensorBus::mapADCToEC(uint16_t adcValue) {
+static float mapADCToEC(uint16_t adcValue) {
     // Placeholder linear map for EC
     return (float)adcValue * (5.0f / 4095.0f);
 }
 
-float SensorBus::mapADCToPH(uint16_t adcValue) {
+static float mapADCToPH(uint16_t adcValue) {
     // Placeholder linear map for pH
     return (float)adcValue * (14.0f / 4095.0f);
 }

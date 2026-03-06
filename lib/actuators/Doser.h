@@ -6,7 +6,7 @@
 
 class Doser {
 public:
-    Doser(IRelayDriver* driver);
+    explicit Doser(IRelayDriver* driver);
 
     void startDose(uint32_t msA, uint32_t msB, uint32_t msPhUp, uint32_t msPhDown, uint32_t now_ms);
     void stop();

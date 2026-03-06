@@ -24,9 +24,6 @@ private:
     AveragingBuffer<uint16_t, 8> ecBuffer;
     AveragingBuffer<uint16_t, 8> phBuffer;
     AveragingBuffer<uint16_t, 4> tankBuffer;
-
-    float mapADCToEC(uint16_t adcValue);
-    float mapADCToPH(uint16_t adcValue);
 };
 
 #endif // SENSORBUS_H
