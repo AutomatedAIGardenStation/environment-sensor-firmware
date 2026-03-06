@@ -31,12 +31,18 @@ public:
     virtual float readHumidity() = 0;
 
     /**
-     * Reads analog soil moisture value for the given zone and converts to 0-100%.
+     * Reads Electrical Conductivity (EC).
      * Applies internal averaging to reduce noise.
-     * @param zone The soil zone index (e.g., 0-3 for 4 zones).
-     * @return Soil moisture in %, or -999.0f on invalid zone or read failure.
+     * @return EC in mS/cm, or -999.0f on read failure.
      */
-    virtual float readSoilMoisture(uint8_t zone) = 0;
+    virtual float readEC() = 0;
+
+    /**
+     * Reads pH level.
+     * Applies internal averaging to reduce noise.
+     * @return pH, or -999.0f on read failure.
+     */
+    virtual float readPH() = 0;
 
     /**
      * Reads analog tank level value and converts to 0-100%.

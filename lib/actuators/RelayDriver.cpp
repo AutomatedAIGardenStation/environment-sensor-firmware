@@ -9,33 +9,39 @@
 #endif
 
 void RelayDriver::begin() {
-    const uint8_t pump_pins[ZONE_COUNT] = { PIN_PUMP_ZONE1, PIN_PUMP_ZONE2, PIN_PUMP_ZONE3, PIN_PUMP_ZONE4 };
+    pinMode(PIN_MAIN_PUMP, OUTPUT);
 
-    for (uint8_t i = 0; i < ZONE_COUNT; i++) {
-        pinMode(pump_pins[i], OUTPUT);
+    const uint8_t valve_pins[VALVE_COUNT] = { PIN_VALVE_NUT_A, PIN_VALVE_NUT_B, PIN_VALVE_PH_UP, PIN_VALVE_PH_DOWN, PIN_VALVE_CO2 };
+    for (uint8_t i = 0; i < VALVE_COUNT; i++) {
+        pinMode(valve_pins[i], OUTPUT);
     }
 
     // Turn them all off initially
-    for (uint8_t i = 0; i < ZONE_COUNT; i++) {
-        setPump(i, false);
+    setMainPump(false);
+    for (uint8_t i = 0; i < VALVE_COUNT; i++) {
+        setValve(i, false);
     }
 }
 
-void RelayDriver::setPump(uint8_t zone, bool on) {
-    if (zone >= ZONE_COUNT) return;
-
-    const uint8_t pump_pins[ZONE_COUNT] = { PIN_PUMP_ZONE1, PIN_PUMP_ZONE2, PIN_PUMP_ZONE3, PIN_PUMP_ZONE4 };
-    uint8_t pin = pump_pins[zone];
-
+void RelayDriver::setMainPump(bool on) {
 #if defined(ARDUINO_AVR_NANO) || defined(ARDUINO_AVR_UNO)
     // Relay outputs (active LOW – relay module pulled to GND by default)
-    digitalWrite(pin, on ? LOW : HIGH);
+    digitalWrite(PIN_MAIN_PUMP, on ? LOW : HIGH);
 #else
     // ESP32 and others (active HIGH)
-    digitalWrite(pin, on ? HIGH : LOW);
+    digitalWrite(PIN_MAIN_PUMP, on ? HIGH : LOW);
 #endif
 }
 
-void RelayDriver::setRelay(uint8_t zone, bool on) {
-    setPump(zone, on);
+void RelayDriver::setValve(uint8_t valveId, bool on) {
+    if (valveId >= VALVE_COUNT) return;
+
+    const uint8_t valve_pins[VALVE_COUNT] = { PIN_VALVE_NUT_A, PIN_VALVE_NUT_B, PIN_VALVE_PH_UP, PIN_VALVE_PH_DOWN, PIN_VALVE_CO2 };
+    uint8_t pin = valve_pins[valveId];
+
+#if defined(ARDUINO_AVR_NANO) || defined(ARDUINO_AVR_UNO)
+    digitalWrite(pin, on ? LOW : HIGH);
+#else
+    digitalWrite(pin, on ? HIGH : LOW);
+#endif
 }

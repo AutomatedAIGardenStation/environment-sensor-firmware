@@ -8,7 +8,8 @@ class HydraulicWatchdog {
 public:
     explicit HydraulicWatchdog(IRelayDriver* driver);
 
-    void start(uint8_t zone, uint32_t now_ms);
+    void start(uint32_t now_ms);
+    void start(uint32_t now_ms, uint32_t duration_ms);
     void stop();
     void tick(uint32_t now_ms);
 
@@ -16,7 +17,7 @@ private:
     IRelayDriver* driver;
     bool active;
     uint32_t start_ms;
-    uint8_t zone;
+    uint32_t timeout_ms;
 };
 
 #endif // HYDRAULIC_WATCHDOG_H

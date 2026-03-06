@@ -16,19 +16,14 @@ public:
     void begin() override;
     float readTemperature() override;
     float readHumidity() override;
-    float readSoilMoisture(uint8_t zone) override;
+    float readEC() override;
+    float readPH() override;
     float readTankLevel() override;
 
 private:
-    // Averaging buffers for each soil zone
-    AveragingBuffer<uint16_t, 8> soilBuffers[ZONE_COUNT];
+    AveragingBuffer<uint16_t, 8> ecBuffer;
+    AveragingBuffer<uint16_t, 8> phBuffer;
     AveragingBuffer<uint16_t, 4> tankBuffer;
-
-    // Read raw analog ADC value for the specific zone
-    uint16_t readRawSoilADC(uint8_t zone);
-
-    // Platform-dependent function to map ADC value to 0-100% moisture
-    float mapADCToMoisture(uint16_t adcValue);
 };
 
 #endif // SENSORBUS_H

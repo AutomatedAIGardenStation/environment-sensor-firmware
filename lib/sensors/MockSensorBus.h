@@ -9,10 +9,7 @@
  */
 class MockSensorBus : public ISensorBus {
 public:
-    MockSensorBus() : mockTemp(-999.0f), mockHum(-999.0f) {
-        for (uint8_t i = 0; i < ZONE_COUNT; ++i) {
-            mockSoil[i] = -999.0f;
-        }
+    MockSensorBus() : mockTemp(-999.0f), mockHum(-999.0f), mockEC(-999.0f), mockPH(-999.0f), mockTankLevel(-999.0f) {
     }
 
     void begin() override {
@@ -27,32 +24,31 @@ public:
         return mockHum;
     }
 
-    float readSoilMoisture(uint8_t zone) override {
-        if (zone >= ZONE_COUNT) {
-            return -999.0f;
-        }
-        return mockSoil[zone];
+    float readEC() override {
+        return mockEC;
+    }
+
+    float readPH() override {
+        return mockPH;
+    }
+
+    float readTankLevel() override {
+        return mockTankLevel;
     }
 
     // Setters for mocked data
-    void setTemperature(float temp) {
-        mockTemp = temp;
-    }
-
-    void setHumidity(float hum) {
-        mockHum = hum;
-    }
-
-    void setSoilMoisture(uint8_t zone, float moisture) {
-        if (zone < ZONE_COUNT) {
-            mockSoil[zone] = moisture;
-        }
-    }
+    void setTemperature(float temp) { mockTemp = temp; }
+    void setHumidity(float hum) { mockHum = hum; }
+    void setEC(float ec) { mockEC = ec; }
+    void setPH(float ph) { mockPH = ph; }
+    void setTankLevel(float level) { mockTankLevel = level; }
 
 private:
     float mockTemp;
     float mockHum;
-    float mockSoil[ZONE_COUNT];
+    float mockEC;
+    float mockPH;
+    float mockTankLevel;
 };
 
 #endif // MOCKSENSORBUS_H

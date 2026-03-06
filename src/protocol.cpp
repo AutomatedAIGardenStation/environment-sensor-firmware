@@ -10,13 +10,28 @@
 #include <string.h>   // strncmp, strlen, memchr
 #include "../lib/actuators/PwmDriver.h"
 #include "../lib/actuators/HydraulicWatchdog.h"
+#include "../lib/actuators/Doser.h"
 #include "../lib/hal/IRelayDriver.h"
 #include "../config/Config.h"
+
+// Wi-Fi and MQTT logic for ESP32
+#if defined(ESP32) && !defined(NATIVE_TEST)
+#include <WiFi.h>
+// Since PubSubClient.h might be missing in some CI runs or library scopes
+// without modifying global libdeps, we conditionally declare it.
+#if __has_include(<PubSubClient.h>)
+#include <PubSubClient.h>
+static WiFiClient espClient;
+static PubSubClient mqttClient(espClient);
+#define HAS_PUBSUB
+#endif
+#endif
 
 // Global driver instance set by main or tests
 PwmDriver* protocol_g_pwmDriver = nullptr;
 IRelayDriver* protocol_g_relayDriver = nullptr;
 HydraulicWatchdog* protocol_g_watchdog = nullptr;
+Doser* protocol_g_doser = nullptr;
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -27,38 +42,98 @@ static inline bool cmd_match(const char* line, const char* cmd, size_t line_len)
         && (line_len == cmd_len || line[cmd_len] == ':');
 }
 
-// ── stubs ─────────────────────────────────────────────────────────────────────
+// ── implementation ────────────────────────────────────────────────────────────
 
-static void pump_start(const char* params) {
-    uint8_t zone = 0;
+static void pump_run(const char* params) {
+    uint32_t ms = MAX_PUMP_TIME_MS;
     if (params) {
-        const char* zone_str = strstr(params, "zone=");
-        if (zone_str) {
-            zone = atoi(zone_str + 5);
+        const char* ms_str = strstr(params, "ms=");
+        if (ms_str) {
+            ms = atoi(ms_str + 3);
         }
     }
 
     if (protocol_g_relayDriver) {
-        protocol_g_relayDriver->setRelay(zone, true);
+        protocol_g_relayDriver->setMainPump(true);
     }
     if (protocol_g_watchdog) {
-        protocol_g_watchdog->start(zone, millis());
+        protocol_g_watchdog->start(millis(), ms);
+    }
+}
+
+static void pump_main(const char* params) {
+    if (!params) return;
+    const char* state_str = strstr(params, "state=");
+    if (state_str) {
+        bool state = atoi(state_str + 6) != 0;
+        if (protocol_g_relayDriver) {
+            protocol_g_relayDriver->setMainPump(state);
+        }
+        if (state && protocol_g_watchdog) {
+            protocol_g_watchdog->start(millis());
+        } else if (!state && protocol_g_watchdog) {
+            protocol_g_watchdog->stop();
+        }
+    }
+}
+
+static void valve_set(const char* params) {
+    if (!params) return;
+    const char* id_str = strstr(params, "id=");
+    const char* state_str = strstr(params, "state=");
+    if (id_str && state_str) {
+        uint8_t id = 255;
+        if (strncmp(id_str + 3, "NutA", 4) == 0) id = 0;
+        else if (strncmp(id_str + 3, "NutB", 4) == 0) id = 1;
+        else if (strncmp(id_str + 3, "pH_Up", 5) == 0) id = 2;
+        else if (strncmp(id_str + 3, "pH_Down", 7) == 0) id = 3;
+        else if (strncmp(id_str + 3, "CO2", 3) == 0) id = 4;
+
+        bool state = atoi(state_str + 6) != 0;
+        if (id < VALVE_COUNT && protocol_g_relayDriver) {
+            protocol_g_relayDriver->setValve(id, state);
+        }
+    }
+}
+
+static void dose_recipe(const char* params) {
+    if (!params || !protocol_g_doser) return;
+    uint32_t msA = 0, msB = 0, msPhUp = 0, msPhDown = 0;
+
+    const char* pA = strstr(params, "NutA=");
+    if (pA) msA = atoi(pA + 5);
+
+    const char* pB = strstr(params, "NutB=");
+    if (pB) msB = atoi(pB + 5);
+
+    const char* pUp = strstr(params, "pH_Up=");
+    if (pUp) msPhUp = atoi(pUp + 6);
+
+    const char* pDown = strstr(params, "pH_Down=");
+    if (pDown) msPhDown = atoi(pDown + 8);
+
+    protocol_g_doser->startDose(msA, msB, msPhUp, msPhDown, millis());
+}
+
+static void dose_stop() {
+    if (protocol_g_doser) {
+        protocol_g_doser->stop();
     }
 }
 
 static void pump_stop_all() {
     if (protocol_g_relayDriver) {
-        for (uint8_t i = 0; i < ZONE_COUNT; i++) {
-            protocol_g_relayDriver->setRelay(i, false);
+        protocol_g_relayDriver->setMainPump(false);
+        for (uint8_t i = 0; i < VALVE_COUNT; i++) {
+            protocol_g_relayDriver->setValve(i, false);
         }
     }
     if (protocol_g_watchdog) {
         protocol_g_watchdog->stop();
     }
-}
-
-static void nutrient_dose() {
-    // TODO: briefly enable the nutrient pump
+    if (protocol_g_doser) {
+        protocol_g_doser->stop();
+    }
 }
 
 static void light_set(const char* params) {
@@ -75,13 +150,6 @@ static void light_set(const char* params) {
     }
 }
 
-static void light_legacy_all_on() {
-    if (!protocol_g_pwmDriver) return;
-    for (uint8_t i = 0; i < 4; i++) {
-        protocol_g_pwmDriver->setLedChannel(i, 100);
-    }
-}
-
 static void fan_set(const char* params) {
     if (!protocol_g_pwmDriver || !params) return;
 
@@ -92,6 +160,9 @@ static void fan_set(const char* params) {
         protocol_g_pwmDriver->setFan(pct);
     }
 }
+
+// Stubs for now
+static void heat_set(const char* params) {}
 
 void protocol_set_pwm_driver(PwmDriver* driver) {
     protocol_g_pwmDriver = driver;
@@ -105,11 +176,8 @@ void protocol_set_watchdog(HydraulicWatchdog* wd) {
     protocol_g_watchdog = wd;
 }
 
-static void read_and_emit_sensors() {
-    // TODO: read all sensors (temp, humidity, pH, EC, tank level) and emit:
-    //   EVT:SENSOR_DATA:temp=<n>:hum=<n>:ph=<n>:ec=<n>:level=<n>
-    // Example (replace with real sensor reads):
-    Serial.println("EVT:SENSOR_DATA:temp=0.0:hum=0.0:ph=0.0:ec=0.0:level=0");
+void protocol_set_doser(Doser* doser) {
+    protocol_g_doser = doser;
 }
 
 // ── public API ───────────────────────────────────────────────────────────────
@@ -125,8 +193,12 @@ bool protocol_handle_line(const char* line) {
     const char* sep = static_cast<const char*>(memchr(line, ':', len));
     if (sep) params = sep + 1;
 
-    if (cmd_match(line, CMD_WATER_START, len)) {
-        pump_start(params ? params : "");
+    if (cmd_match(line, CMD_PUMP_RUN, len)) {
+        pump_run(params ? params : "");
+        return true;
+    }
+    if (cmd_match(line, CMD_PUMP_MAIN, len)) {
+        pump_main(params ? params : "");
         return true;
     }
     if (cmd_match(line, CMD_WATER_STOP, len)) {
@@ -134,12 +206,16 @@ bool protocol_handle_line(const char* line) {
         protocol_emit_event(EVT_WATER_DONE);
         return true;
     }
-    if (cmd_match(line, "W1", len)) {
-        pump_start("zone=0");
+    if (cmd_match(line, CMD_VALVE_SET, len)) {
+        valve_set(params ? params : "");
         return true;
     }
-    if (cmd_match(line, CMD_FEED, len)) {
-        nutrient_dose();
+    if (cmd_match(line, CMD_DOSE_RECIPE, len)) {
+        dose_recipe(params ? params : "");
+        return true;
+    }
+    if (cmd_match(line, CMD_DOSE_STOP, len)) {
+        dose_stop();
         return true;
     }
     if (cmd_match(line, CMD_LIGHT_SET, len)) {
@@ -150,12 +226,8 @@ bool protocol_handle_line(const char* line) {
         fan_set(params ? params : "");
         return true;
     }
-    if (cmd_match(line, CMD_SENSOR_READ, len)) {
-        read_and_emit_sensors();
-        return true;
-    }
-    if (cmd_match(line, "L1", len)) {
-        light_legacy_all_on();
+    if (cmd_match(line, CMD_HEAT_SET, len)) {
+        heat_set(params ? params : "");
         return true;
     }
     if (cmd_match(line, CMD_NOP, len)) {
@@ -168,5 +240,39 @@ bool protocol_handle_line(const char* line) {
 }
 
 void protocol_emit_event(const char* event) {
+#if defined(ESP32) && !defined(NATIVE_TEST) && defined(HAS_PUBSUB)
+    if (mqttClient.connected()) {
+        mqttClient.publish(MQTT_TOPIC_TELEMETRY, event);
+    } else {
+        Serial.println(event); // Fallback to serial if not connected
+    }
+#else
     Serial.println(event);
+#endif
+}
+
+void protocol_net_begin() {
+#if defined(ESP32) && !defined(NATIVE_TEST)
+    WiFi.begin(WIFI_SSID, WIFI_PASS);
+#if defined(HAS_PUBSUB)
+    mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
+#endif
+#endif
+}
+
+void protocol_net_loop() {
+#if defined(ESP32) && !defined(NATIVE_TEST)
+    if (WiFi.status() == WL_CONNECTED) {
+#if defined(HAS_PUBSUB)
+        if (!mqttClient.connected()) {
+            if (mqttClient.connect("EnvControllerClient")) {
+                // connected
+            }
+        }
+        if (mqttClient.connected()) {
+            mqttClient.loop();
+        }
+#endif
+    }
+#endif
 }

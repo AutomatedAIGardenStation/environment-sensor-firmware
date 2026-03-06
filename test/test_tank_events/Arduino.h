@@ -47,7 +47,7 @@ void digitalWrite(uint8_t pin, uint8_t val);
 // Used in main tests
 class String {
 public:
-    String(float f, int dec = 1) {
+    explicit String(float f, int dec = 1) {
         snprintf(buf, sizeof(buf), "%.1f", f);
     }
     const char* c_str() const { return buf; }
