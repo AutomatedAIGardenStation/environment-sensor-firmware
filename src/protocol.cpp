@@ -42,6 +42,21 @@ Doser* protocol_g_doser = nullptr;
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
+static uint8_t crc8(const uint8_t* data, size_t len) {
+    uint8_t crc = 0x00;
+    for (size_t i = 0; i < len; ++i) {
+        crc ^= data[i];
+        for (uint8_t j = 0; j < 8; ++j) {
+            if (crc & 0x80) {
+                crc = (crc << 1) ^ 0x07;
+            } else {
+                crc <<= 1;
+            }
+        }
+    }
+    return crc;
+}
+
 static inline bool cmd_match(const char* line, const char* cmd, size_t line_len) {
     size_t cmd_len = strlen(cmd);
     if (line_len < cmd_len) return false;
@@ -196,54 +211,96 @@ bool protocol_handle_line(const char* line) {
         len--;
     if (len == 0) return false;
 
+    char buf[128];
+    if (len >= sizeof(buf)) len = sizeof(buf) - 1;
+    memcpy(buf, line, len);
+    buf[len] = '\0';
+
+    char* first_colon = strchr(buf, ':');
+    if (!first_colon) {
+        Serial.print("ERR:UNKNOWN:");
+        Serial.println(buf);
+        return false;
+    }
+    *first_colon = '\0';
+    const char* seq_str = buf;
+
+    char* crc_ptr = strstr(first_colon + 1, ":CRC=");
+    if (!crc_ptr) {
+        Serial.print("NACK:");
+        Serial.print(seq_str);
+        Serial.println(":BADCRC");
+        return false;
+    }
+
+    // include the colon before CRC=
+    size_t payload_len = (crc_ptr - buf) + 1;
+    uint8_t calculated_crc = crc8((const uint8_t*)line, payload_len);
+
+    const char* crc_hex_str = crc_ptr + 5;
+    char hex_buf[3] = {0};
+    strncpy(hex_buf, crc_hex_str, 2);
+    uint8_t received_crc = (uint8_t)strtol(hex_buf, nullptr, 16);
+
+    if (calculated_crc != received_crc) {
+        Serial.print("NACK:");
+        Serial.print(seq_str);
+        Serial.println(":BADCRC");
+        return false;
+    }
+
+    *crc_ptr = '\0';
+    const char* cmd_str = first_colon + 1;
+    size_t cmd_len = strlen(cmd_str);
+
     const char* params = nullptr;
-    const char* sep = static_cast<const char*>(memchr(line, ':', len));
+    const char* sep = strchr(cmd_str, ':');
     if (sep) params = sep + 1;
 
-    if (cmd_match(line, CMD_PUMP_RUN, len)) {
+    bool handled = false;
+
+    if (cmd_match(cmd_str, CMD_PUMP_RUN, cmd_len)) {
         pump_run(params ? params : "");
-        return true;
-    }
-    if (cmd_match(line, CMD_PUMP_MAIN, len)) {
+        handled = true;
+    } else if (cmd_match(cmd_str, CMD_PUMP_MAIN, cmd_len)) {
         pump_main(params ? params : "");
-        return true;
-    }
-    if (cmd_match(line, CMD_WATER_STOP, len)) {
+        handled = true;
+    } else if (cmd_match(cmd_str, CMD_WATER_STOP, cmd_len)) {
         pump_stop_all();
         protocol_emit_event(EVT_WATER_DONE);
-        return true;
-    }
-    if (cmd_match(line, CMD_VALVE_SET, len)) {
+        handled = true;
+    } else if (cmd_match(cmd_str, CMD_VALVE_SET, cmd_len)) {
         valve_set(params ? params : "");
-        return true;
-    }
-    if (cmd_match(line, CMD_DOSE_RECIPE, len)) {
+        handled = true;
+    } else if (cmd_match(cmd_str, CMD_DOSE_RECIPE, cmd_len)) {
         dose_recipe(params ? params : "");
-        return true;
-    }
-    if (cmd_match(line, CMD_DOSE_STOP, len)) {
+        handled = true;
+    } else if (cmd_match(cmd_str, CMD_DOSE_STOP, cmd_len)) {
         dose_stop();
-        return true;
-    }
-    if (cmd_match(line, CMD_LIGHT_SET, len)) {
+        handled = true;
+    } else if (cmd_match(cmd_str, CMD_LIGHT_SET, cmd_len)) {
         light_set(params ? params : "");
-        return true;
-    }
-    if (cmd_match(line, CMD_FAN_SET, len)) {
+        handled = true;
+    } else if (cmd_match(cmd_str, CMD_FAN_SET, cmd_len)) {
         fan_set(params ? params : "");
-        return true;
-    }
-    if (cmd_match(line, CMD_HEAT_SET, len)) {
+        handled = true;
+    } else if (cmd_match(cmd_str, CMD_HEAT_SET, cmd_len)) {
         heat_set(params ? params : "");
-        return true;
-    }
-    if (cmd_match(line, CMD_NOP, len)) {
-        return true;
+        handled = true;
+    } else if (cmd_match(cmd_str, CMD_NOP, cmd_len)) {
+        handled = true;
     }
 
-    Serial.print("ERR:UNKNOWN:");
-    Serial.println(line);
-    return false;
+    if (handled) {
+        Serial.print("ACK:");
+        Serial.println(seq_str);
+        return true;
+    } else {
+        Serial.print("NACK:");
+        Serial.print(seq_str);
+        Serial.println(":UNKNOWN");
+        return false;
+    }
 }
 
 void protocol_emit_event(const char* event) {
