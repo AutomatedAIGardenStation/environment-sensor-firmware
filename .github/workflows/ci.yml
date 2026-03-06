@@ -81,10 +81,10 @@ jobs:
 
   # ── Notify ci-cd repo ──────────────────────────────────────────────────────
   notify-ci-cd:
-    name: Notify GardenStation-ci-cd
+    name: Notify pipeline-orchestrator
     runs-on: ubuntu-latest
     needs: [build, lint, test]
-    if: always()
+    if: github.event_name == 'pull_request' && always()
     steps:
       - name: Dispatch env-controller-changed
         uses: actions/github-script@v7
