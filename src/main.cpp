@@ -81,6 +81,17 @@ void task_sensors() {
             else if (ph > 6.5f) protocol_emit_event("EVT:PH_HIGH");
         }
     }
+
+    // Add missing CO2 telemetry separately to avoid breaking EVT:SENSOR_UPDATE format
+    float co2 = g_sensorBus.readCO2();
+    if (co2 != -999.0f) {
+        snprintf(buf, sizeof(buf), "EVT:CO2_LEVEL:co2=%.0f", co2);
+        protocol_emit_event(buf);
+
+        if (co2 < 400.0f) {
+            protocol_emit_event("EVT:CO2_LOW");
+        }
+    }
 }
 
 void task_tank_level() {
@@ -199,4 +210,6 @@ void loop() {
     g_pollingEngine.tick(now);
     protocol_net_loop();
 #endif
+
+    g_sensorBus.tick(now);
 }

@@ -80,7 +80,7 @@ void test_tank_level_above_threshold() {
 
     for(int i=0; i<4; i++) {
         mock_analog_val = levelToADC(50.0f);
-        current_time_ms_pwm += 1000;
+        current_time_ms_pwm += 2000;
         loop();
         // Since heartbeat emits every 1000ms now, it overwrites last_emitted_event
         // Let's clear it if it's heartbeat
@@ -94,18 +94,21 @@ void test_tank_level_above_threshold() {
 }
 
 void test_tank_level_drops_below_threshold() {
+    setup();
     last_emitted_event[0] = '\0';
+    all_emitted_events[0] = '\0';
     pump_stopped = false;
 
     for(int i=0; i<4; i++) {
         mock_analog_val = levelToADC(5.0f);
-        current_time_ms_pwm += 1000;
+        // The tank task polls at TANK_POLL_MS (1000ms),
+        // but now the bus has its own tick internally.
+        // It requires SENSOR_POLL_INTERVAL_MS (2000ms) to read valid data in SensorBus.
+        // Let's call loop() multiple times to ensure enough ticks happen.
+        current_time_ms_pwm += 2000;
         loop();
-        // We expect EVT:TANK_EMPTY to be emitted when it drops below
-        if (strncmp(last_emitted_event, "EVT:HEARTBEAT", 13) == 0) {
-            // Heartbeat overwrote our TANK_EMPTY event if TANK_EMPTY was emitted first
-            // To fix this, let's look at all_emitted_events
-        }
+        current_time_ms_pwm += 2000;
+        loop();
     }
 
     TEST_ASSERT_NOT_NULL(strstr(all_emitted_events, "EVT:TANK_EMPTY:level_pct=5"));
@@ -115,7 +118,7 @@ void test_tank_level_drops_below_threshold() {
 void test_tank_level_stays_below_threshold() {
     mock_analog_val = levelToADC(5.0f);
 
-    current_time_ms_pwm += 1000;
+    current_time_ms_pwm += 2000;
     loop(); // Emits EVT:TANK_EMPTY
 
     // Clear string
@@ -124,7 +127,7 @@ void test_tank_level_stays_below_threshold() {
     pump_stopped = false;
 
     // Next poll
-    current_time_ms_pwm += 1000;
+    current_time_ms_pwm += 2000;
     mock_analog_val = levelToADC(4.0f);
     loop(); // Still below, guard prevents emit
 
@@ -132,17 +135,24 @@ void test_tank_level_stays_below_threshold() {
 }
 
 void test_tank_level_rises_and_drops() {
+    // Ensure initial setup runs
+    setup();
+
     // Drop
     for(int i=0; i<4; i++) {
         mock_analog_val = levelToADC(5.0f);
-        current_time_ms_pwm += 1000;
+        current_time_ms_pwm += 2000; // Increment past sensor interval
+        loop();
+        current_time_ms_pwm += 2000;
         loop();
     }
 
     // Rise
     for(int i=0; i<4; i++) {
         mock_analog_val = levelToADC(50.0f);
-        current_time_ms_pwm += 1000;
+        current_time_ms_pwm += 2000;
+        loop();
+        current_time_ms_pwm += 2000;
         loop();
     }
 
@@ -153,7 +163,9 @@ void test_tank_level_rises_and_drops() {
     // Drop again
     for(int i=0; i<4; i++) {
         mock_analog_val = levelToADC(8.0f);
-        current_time_ms_pwm += 1000;
+        current_time_ms_pwm += 2000;
+        loop();
+        current_time_ms_pwm += 2000;
         loop();
     }
 

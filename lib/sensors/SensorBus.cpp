@@ -10,10 +10,31 @@
 // For the sake of this issue, we provide structural logic and placeholders
 // for ambient sensors, but full actual logic for soil moisture averaging.
 
-SensorBus::SensorBus() {
+SensorBus::SensorBus()
+    : phAdapter(I2C_ADDR_PH, SENSOR_CONV_DELAY_MS, SENSOR_POLL_INTERVAL_MS, SENSOR_STALE_TIMEOUT_MS, 0.0f, 14.0f),
+      ecAdapter(I2C_ADDR_EC, SENSOR_CONV_DELAY_MS, SENSOR_POLL_INTERVAL_MS, SENSOR_STALE_TIMEOUT_MS, 0.0f, 10.0f),
+      co2Adapter(I2C_ADDR_CO2, SENSOR_CONV_DELAY_MS, SENSOR_POLL_INTERVAL_MS, SENSOR_STALE_TIMEOUT_MS, 0.0f, 5000.0f),
+      tempHumAdapter(I2C_ADDR_SHT31, SHT31_CONV_DELAY_MS, SENSOR_POLL_INTERVAL_MS, SENSOR_STALE_TIMEOUT_MS),
+      last_tank_poll_ms(0) {
 }
 
 SensorBus::~SensorBus() {
+}
+
+void SensorBus::tick(uint32_t now) {
+    phAdapter.tick(now);
+    ecAdapter.tick(now);
+    co2Adapter.tick(now);
+    tempHumAdapter.tick(now);
+
+    // Poll tank level every interval
+    if (now - last_tank_poll_ms >= SENSOR_POLL_INTERVAL_MS) {
+        last_tank_poll_ms = now;
+#ifdef PIN_TANK_LEVEL
+        uint16_t rawVal = analogRead(PIN_TANK_LEVEL);
+        tankBuffer.push(rawVal);
+#endif
+    }
 }
 
 void SensorBus::begin() {
@@ -40,63 +61,34 @@ void SensorBus::begin() {
 }
 
 float SensorBus::readTemperature() {
-    // Placeholder logic for reading temperature via I2C (DHT22-compatible or SHT31).
-    // The instructions state: returns float in °C; returns -999.0f on read failure.
-    // In a real implementation we would call a sensor driver here.
-
-    // As real I2C hardware initialization on ESP32 is out of scope
-    // and tests use the mock, return the failure condition for now
-    // to simulate "unavailable" since the physical sensor is not present.
-    return -999.0f;
+    return tempHumAdapter.getTemperatureAverage();
 }
 
 float SensorBus::readHumidity() {
-    // Placeholder logic for reading ambient relative humidity (%).
-    // Returns -999.0f on read failure.
-    return -999.0f;
-}
-
-static float mapADCToEC(uint16_t adcValue) {
-    // Placeholder linear map for EC
-    return (float)adcValue * (5.0f / 4095.0f);
-}
-
-static float mapADCToPH(uint16_t adcValue) {
-    // Placeholder linear map for pH
-    return (float)adcValue * (14.0f / 4095.0f);
+    return tempHumAdapter.getHumidityAverage();
 }
 
 float SensorBus::readEC() {
-#ifdef PIN_EC_SENSOR
-    uint16_t rawVal = analogRead(PIN_EC_SENSOR);
-    ecBuffer.push(rawVal);
-    return mapADCToEC((uint16_t)ecBuffer.average());
-#else
-    return -999.0f;
-#endif
+    return ecAdapter.getAverage();
 }
 
 float SensorBus::readPH() {
-#ifdef PIN_PH_SENSOR
-    uint16_t rawVal = analogRead(PIN_PH_SENSOR);
-    phBuffer.push(rawVal);
-    return mapADCToPH((uint16_t)phBuffer.average());
-#else
-    return -999.0f;
-#endif
+    return phAdapter.getAverage();
+}
+
+float SensorBus::readCO2() {
+    return co2Adapter.getAverage();
 }
 
 float SensorBus::readTankLevel() {
 #ifdef PIN_TANK_LEVEL
-    uint16_t rawVal = analogRead(PIN_TANK_LEVEL);
-    tankBuffer.push(rawVal);
+    // No valid reads pushed yet
+    if (tankBuffer.average() == 0.0f && tankBuffer.isFull() == false) {
+        return -999.0f;
+    }
+
     float avgRaw = tankBuffer.average();
 
-    // Using a simple linear mapping for now: assume higher ADC is higher level or lower level
-    // Assuming higher ADC is lower tank level, similar to soil mapping. Or maybe opposite.
-    // The issue says: "reads the tank level sensor ... returns 0-100%".
-    // We can use the same mapADCToMoisture for consistency or create a mapADCToTankLevel.
-    // If not specified, a typical mapping is fine. Let's create a linear mapping here.
 #if defined(ESP32)
     const float dryValue = 4095.0f;
     const float wetValue = 0.0f;
