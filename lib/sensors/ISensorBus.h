@@ -50,6 +50,18 @@ public:
      * @return Tank level in %, or -999.0f on read failure.
      */
     virtual float readTankLevel() = 0;
+
+    /**
+     * Reads CO2 level from I2C sensor.
+     * @return CO2 level in ppm, or -999.0f on read failure.
+     */
+    virtual float readCO2() = 0;
+
+    /**
+     * Ticks the sensor bus non-blocking state machines.
+     * @param now Current time in ms.
+     */
+    virtual void tick(uint32_t now) = 0;
 };
 
 #endif // ISENSORBUS_H

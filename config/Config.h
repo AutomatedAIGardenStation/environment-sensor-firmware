@@ -17,6 +17,17 @@
 #define PWM_FREQ                  1000  // 1000 Hz PWM frequency
 #define PWM_RESOLUTION            13    // 13-bit PWM resolution
 
+// ── Sensor Configuration ──────────────────────────────────────────────────
+#define I2C_ADDR_PH               0x63  // 99
+#define I2C_ADDR_EC               0x64  // 100
+#define I2C_ADDR_CO2              0x69  // 105
+#define I2C_ADDR_SHT31            0x44  // 68
+
+#define SENSOR_POLL_INTERVAL_MS   2000  // Poll sensors every 2 seconds internally
+#define SENSOR_STALE_TIMEOUT_MS   10000 // Consider reading stale after 10 seconds
+#define SENSOR_CONV_DELAY_MS      900   // Wait 900ms for I2C conversion (common for EZO sensors)
+#define SHT31_CONV_DELAY_MS       15    // SHT31 conversion delay
+
 #if defined(ARDUINO_AVR_NANO) || defined(ARDUINO_AVR_UNO)
   // ── Arduino Nano / Uno (ATmega328P) ────────────────────────────────────
   // Relay outputs (active LOW – relay module pulled to GND by default)

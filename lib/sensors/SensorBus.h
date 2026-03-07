@@ -4,6 +4,7 @@
 #include "ISensorBus.h"
 #include "../../config/Config.h"
 #include "../util/AveragingBuffer.h"
+#include "I2CSensorAdapters.h"
 
 /**
  * Concrete implementation of ISensorBus for reading physical sensors.
@@ -19,11 +20,18 @@ public:
     float readEC() override;
     float readPH() override;
     float readTankLevel() override;
+    float readCO2() override;
+
+    void tick(uint32_t now) override;
 
 private:
-    AveragingBuffer<uint16_t, 8> ecBuffer;
-    AveragingBuffer<uint16_t, 8> phBuffer;
+    AtlasSensorAdapter phAdapter;
+    AtlasSensorAdapter ecAdapter;
+    AtlasSensorAdapter co2Adapter;
+    SHT31Adapter tempHumAdapter;
+
     AveragingBuffer<uint16_t, 4> tankBuffer;
+    uint32_t last_tank_poll_ms;
 };
 
 #endif // SENSORBUS_H
