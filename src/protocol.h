@@ -17,7 +17,7 @@
 #define CMD_DOSE_RECIPE  "DOSE_RECIPE"   // :NutA=<ms>:NutB=<ms>:pH_Up=<ms>:pH_Down=<ms>
 #define CMD_DOSE_STOP    "DOSE_STOP"
 
-#define CMD_LIGHT_SET    "LIGHT_SET"     // :ch=<n>:pct=<0-100>
+#define CMD_LIGHT_MODE   "LIGHT_MODE"    // :<preset>
 #define CMD_FAN_SET      "FAN_SET"       // :pct=<0-100>
 #define CMD_HEAT_SET     "HEAT_SET"      // :pct=<0-100>
 #define CMD_NOP          "NOP"

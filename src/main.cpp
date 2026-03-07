@@ -160,9 +160,11 @@ void loop() {
     uint32_t now = millis();
 
     // ── Read Serial ──────────────────────────────────────────────────────────
+    // cppcheck-suppress knownConditionTrueFalse
     while (Serial.available()) {
-        char c = (char)Serial.read();
+        char c = static_cast<char>(Serial.read());
         g_last_rx_ms = now; // Update PING watchdog
+        // cppcheck-suppress knownConditionTrueFalse
         if (c == '\n' || c == '\r') {
             if (g_line_len > 0) {
                 g_line_buf[g_line_len] = '\0';
