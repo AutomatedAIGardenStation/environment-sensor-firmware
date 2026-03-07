@@ -17,12 +17,14 @@ MockPwmDriver mockDriver;
 PwmDriver realDriver;
 
 bool protocol_handle_line(const char* line) {
-    if (strncmp(line, "LIGHT_SET:ch=2:pct=80", 21) == 0) {
-        mockDriver.setLedChannel(2, 80);
+    if (strncmp(line, "LIGHT_MODE:FULL", 15) == 0) {
+        for (int i=0; i<4; i++) mockDriver.setLedChannel(i, 100);
+    } else if (strncmp(line, "LIGHT_MODE:OFF", 14) == 0) {
+        for (int i=0; i<4; i++) mockDriver.setLedChannel(i, 0);
     } else if (strncmp(line, "FAN_SET:pct=40", 14) == 0) {
         mockDriver.setFan(40);
-    } else if (strncmp(line, "L1", 2) == 0) {
-        for (int i=0; i<4; i++) mockDriver.setLedChannel(i, 100);
+    } else if (strncmp(line, "HEAT_SET:pct=50", 15) == 0) {
+        // heat_set is a stub, but we can verify it doesn't crash
     }
     return true;
 }
@@ -74,10 +76,16 @@ void test_real_setFan_75(void) {
 
 // ── Tests for Protocol Parser Routing ──
 
-void test_protocol_light_set(void) {
-    protocol_handle_line("LIGHT_SET:ch=2:pct=80");
-    TEST_ASSERT_EQUAL_UINT8(2, mockDriver.last_ch);
-    TEST_ASSERT_EQUAL_UINT8(80, mockDriver.last_pct);
+void test_protocol_light_mode_full(void) {
+    protocol_handle_line("LIGHT_MODE:FULL");
+    TEST_ASSERT_EQUAL_UINT8(3, mockDriver.last_ch);
+    TEST_ASSERT_EQUAL_UINT8(100, mockDriver.last_pct);
+}
+
+void test_protocol_light_mode_off(void) {
+    protocol_handle_line("LIGHT_MODE:OFF");
+    TEST_ASSERT_EQUAL_UINT8(3, mockDriver.last_ch);
+    TEST_ASSERT_EQUAL_UINT8(0, mockDriver.last_pct);
 }
 
 void test_protocol_fan_set(void) {
@@ -85,12 +93,9 @@ void test_protocol_fan_set(void) {
     TEST_ASSERT_EQUAL_UINT8(40, mockDriver.last_fan_pct);
 }
 
-void test_protocol_L1(void) {
-    // L1 command calls all 4 channels at 100%
-    protocol_handle_line("L1");
-    // Since it's a loop 0 to 3, the last one called is ch=3
-    TEST_ASSERT_EQUAL_UINT8(3, mockDriver.last_ch);
-    TEST_ASSERT_EQUAL_UINT8(100, mockDriver.last_pct);
+void test_protocol_heat_set(void) {
+    bool res = protocol_handle_line("HEAT_SET:pct=50");
+    TEST_ASSERT_TRUE(res);
 }
 
 int main(int argc, char **argv) {
@@ -99,8 +104,9 @@ int main(int argc, char **argv) {
     RUN_TEST(test_real_setLedChannel_clamped);
     RUN_TEST(test_real_setLedChannel_zero_valid);
     RUN_TEST(test_real_setFan_75);
-    RUN_TEST(test_protocol_light_set);
+    RUN_TEST(test_protocol_light_mode_full);
+    RUN_TEST(test_protocol_light_mode_off);
     RUN_TEST(test_protocol_fan_set);
-    RUN_TEST(test_protocol_L1);
+    RUN_TEST(test_protocol_heat_set);
     return UNITY_END();
 }

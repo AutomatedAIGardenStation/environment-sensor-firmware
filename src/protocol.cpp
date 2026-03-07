@@ -158,17 +158,34 @@ static void pump_stop_all() {
     }
 }
 
-static void light_set(const char* params) {
+static void light_mode(const char* params) {
     if (!protocol_g_pwmDriver || !params) return;
 
-    // Parse ":ch=<n>:pct=<0-100>"
-    const char* ch_str = strstr(params, "ch=");
-    const char* pct_str = strstr(params, "pct=");
-
-    if (ch_str && pct_str) {
-        uint8_t ch = atoi(ch_str + 3);
-        uint8_t pct = atoi(pct_str + 4);
-        protocol_g_pwmDriver->setLedChannel(ch, pct);
+    if (strncmp(params, "OFF", 3) == 0) {
+        protocol_g_pwmDriver->setLedChannel(0, 0);
+        protocol_g_pwmDriver->setLedChannel(1, 0);
+        protocol_g_pwmDriver->setLedChannel(2, 0);
+        protocol_g_pwmDriver->setLedChannel(3, 0);
+    } else if (strncmp(params, "SEEDLING", 8) == 0) {
+        protocol_g_pwmDriver->setLedChannel(0, 100);
+        protocol_g_pwmDriver->setLedChannel(1, 100);
+        protocol_g_pwmDriver->setLedChannel(2, 0);
+        protocol_g_pwmDriver->setLedChannel(3, 0);
+    } else if (strncmp(params, "VEG", 3) == 0) {
+        protocol_g_pwmDriver->setLedChannel(0, 100);
+        protocol_g_pwmDriver->setLedChannel(1, 100);
+        protocol_g_pwmDriver->setLedChannel(2, 100);
+        protocol_g_pwmDriver->setLedChannel(3, 0);
+    } else if (strncmp(params, "BLOOM", 5) == 0) {
+        protocol_g_pwmDriver->setLedChannel(0, 100);
+        protocol_g_pwmDriver->setLedChannel(1, 100);
+        protocol_g_pwmDriver->setLedChannel(2, 100);
+        protocol_g_pwmDriver->setLedChannel(3, 100);
+    } else if (strncmp(params, "FULL", 4) == 0) {
+        protocol_g_pwmDriver->setLedChannel(0, 100);
+        protocol_g_pwmDriver->setLedChannel(1, 100);
+        protocol_g_pwmDriver->setLedChannel(2, 100);
+        protocol_g_pwmDriver->setLedChannel(3, 100);
     }
 }
 
@@ -184,7 +201,16 @@ static void fan_set(const char* params) {
 }
 
 // Stubs for now
-static void heat_set(const char* params) {}
+static void heat_set(const char* params) {
+    if (!params) return;
+
+    // Parse ":pct=<0-100>"
+    const char* pct_str = strstr(params, "pct=");
+    if (pct_str) {
+        uint8_t pct = atoi(pct_str + 4);
+        (void)pct; // Just parse for now to align with command contract
+    }
+}
 
 void protocol_set_pwm_driver(PwmDriver* driver) {
     protocol_g_pwmDriver = driver;
@@ -278,8 +304,8 @@ bool protocol_handle_line(const char* line) {
     } else if (cmd_match(cmd_str, CMD_DOSE_STOP, cmd_len)) {
         dose_stop();
         handled = true;
-    } else if (cmd_match(cmd_str, CMD_LIGHT_SET, cmd_len)) {
-        light_set(params ? params : "");
+    } else if (cmd_match(cmd_str, CMD_LIGHT_MODE, cmd_len)) {
+        light_mode(params ? params : "");
         handled = true;
     } else if (cmd_match(cmd_str, CMD_FAN_SET, cmd_len)) {
         fan_set(params ? params : "");
