@@ -21,8 +21,6 @@ bool protocol_handle_line(const char* line) {
         for (int i=0; i<4; i++) mockDriver.setLedChannel(i, 100);
     } else if (strncmp(line, "LIGHT_MODE:OFF", 14) == 0) {
         for (int i=0; i<4; i++) mockDriver.setLedChannel(i, 0);
-    } else if (strncmp(line, "FAN_SET:pct=40", 14) == 0) {
-        mockDriver.setFan(40);
     } else if (strncmp(line, "HEAT_SET:pct=50", 15) == 0) {
         // heat_set is a stub, but we can verify it doesn't crash
     }
@@ -88,11 +86,6 @@ void test_protocol_light_mode_off(void) {
     TEST_ASSERT_EQUAL_UINT8(0, mockDriver.last_pct);
 }
 
-void test_protocol_fan_set(void) {
-    protocol_handle_line("FAN_SET:pct=40");
-    TEST_ASSERT_EQUAL_UINT8(40, mockDriver.last_fan_pct);
-}
-
 void test_protocol_heat_set(void) {
     bool res = protocol_handle_line("HEAT_SET:pct=50");
     TEST_ASSERT_TRUE(res);
@@ -106,7 +99,6 @@ int main(int argc, char **argv) {
     RUN_TEST(test_real_setFan_75);
     RUN_TEST(test_protocol_light_mode_full);
     RUN_TEST(test_protocol_light_mode_off);
-    RUN_TEST(test_protocol_fan_set);
     RUN_TEST(test_protocol_heat_set);
     return UNITY_END();
 }

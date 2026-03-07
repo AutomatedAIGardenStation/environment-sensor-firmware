@@ -12,13 +12,10 @@
 // ── Inbound commands (backend → env_controller) ──────────────────────────────
 #define CMD_PUMP_RUN     "PUMP_RUN"      // :ms=<time>
 #define CMD_PUMP_MAIN    "PUMP_MAIN"     // :state=<0|1>
-#define CMD_WATER_STOP   "WATER_STOP"
 #define CMD_VALVE_SET    "VALVE_SET"     // :id=<name>:state=<0|1>
 #define CMD_DOSE_RECIPE  "DOSE_RECIPE"   // :NutA=<ms>:NutB=<ms>:pH_Up=<ms>:pH_Down=<ms>
-#define CMD_DOSE_STOP    "DOSE_STOP"
 
 #define CMD_LIGHT_MODE   "LIGHT_MODE"    // :<preset>
-#define CMD_FAN_SET      "FAN_SET"       // :pct=<0-100>
 #define CMD_HEAT_SET     "HEAT_SET"      // :pct=<0-100>
 #define CMD_NOP          "NOP"
 

@@ -137,27 +137,6 @@ static void dose_recipe(const char* params) {
     protocol_g_doser->startDose(msA, msB, msPhUp, msPhDown, millis());
 }
 
-static void dose_stop() {
-    if (protocol_g_doser) {
-        protocol_g_doser->stop();
-    }
-}
-
-static void pump_stop_all() {
-    if (protocol_g_relayDriver) {
-        protocol_g_relayDriver->setMainPump(false);
-        for (uint8_t i = 0; i < VALVE_COUNT; i++) {
-            protocol_g_relayDriver->setValve(i, false);
-        }
-    }
-    if (protocol_g_watchdog) {
-        protocol_g_watchdog->stop();
-    }
-    if (protocol_g_doser) {
-        protocol_g_doser->stop();
-    }
-}
-
 static void light_mode(const char* params) {
     if (!protocol_g_pwmDriver || !params) return;
 
@@ -186,17 +165,6 @@ static void light_mode(const char* params) {
         protocol_g_pwmDriver->setLedChannel(1, 100);
         protocol_g_pwmDriver->setLedChannel(2, 100);
         protocol_g_pwmDriver->setLedChannel(3, 100);
-    }
-}
-
-static void fan_set(const char* params) {
-    if (!protocol_g_pwmDriver || !params) return;
-
-    // Parse ":pct=<0-100>"
-    const char* pct_str = strstr(params, "pct=");
-    if (pct_str) {
-        uint8_t pct = atoi(pct_str + 4);
-        protocol_g_pwmDriver->setFan(pct);
     }
 }
 
@@ -291,24 +259,14 @@ bool protocol_handle_line(const char* line) {
     } else if (cmd_match(cmd_str, CMD_PUMP_MAIN, cmd_len)) {
         pump_main(params ? params : "");
         handled = true;
-    } else if (cmd_match(cmd_str, CMD_WATER_STOP, cmd_len)) {
-        pump_stop_all();
-        protocol_emit_event(EVT_WATER_DONE);
-        handled = true;
     } else if (cmd_match(cmd_str, CMD_VALVE_SET, cmd_len)) {
         valve_set(params ? params : "");
         handled = true;
     } else if (cmd_match(cmd_str, CMD_DOSE_RECIPE, cmd_len)) {
         dose_recipe(params ? params : "");
         handled = true;
-    } else if (cmd_match(cmd_str, CMD_DOSE_STOP, cmd_len)) {
-        dose_stop();
-        handled = true;
     } else if (cmd_match(cmd_str, CMD_LIGHT_MODE, cmd_len)) {
         light_mode(params ? params : "");
-        handled = true;
-    } else if (cmd_match(cmd_str, CMD_FAN_SET, cmd_len)) {
-        fan_set(params ? params : "");
         handled = true;
     } else if (cmd_match(cmd_str, CMD_HEAT_SET, cmd_len)) {
         heat_set(params ? params : "");

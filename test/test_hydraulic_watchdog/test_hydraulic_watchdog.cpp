@@ -32,11 +32,6 @@ bool protocol_handle_line(const char* line) {
     if (strncmp(line, "PUMP_RUN:ms=1000", 16) == 0) {
         mockDriver->setMainPump(true);
         watchdog->start(current_time_ms, 1000);
-    } else if (strncmp(line, "WATER_STOP", 10) == 0) {
-        mockDriver->setMainPump(false);
-        for (int i=0; i<VALVE_COUNT; i++) mockDriver->setValve(i, false);
-        watchdog->stop();
-        protocol_emit_event("EVT:WATER_DONE");
     } else if (strncmp(line, "PUMP_MAIN:state=1", 17) == 0) {
         mockDriver->setMainPump(true);
         watchdog->start(current_time_ms);
@@ -117,25 +112,6 @@ void test_watchdog_stop_before_timeout_cancels(void) {
     TEST_ASSERT_EQUAL_STRING("", last_emitted_event);
 }
 
-void test_water_start_then_stop_protocol(void) {
-    current_time_ms = 1000;
-    protocol_handle_line("PUMP_RUN:ms=1000");
-
-    TEST_ASSERT_TRUE(mockDriver->main_pump_state);
-
-    current_time_ms += 100;
-    protocol_handle_line("WATER_STOP");
-
-    TEST_ASSERT_FALSE(mockDriver->main_pump_state);
-    TEST_ASSERT_EQUAL_STRING(EVT_WATER_DONE, last_emitted_event);
-
-    current_time_ms += 2000; // Now past original timeout
-    watchdog->tick(current_time_ms);
-
-    TEST_ASSERT_FALSE(mockDriver->main_pump_state);
-    TEST_ASSERT_EQUAL_STRING(EVT_WATER_DONE, last_emitted_event); // No overcurrent
-}
-
 void test_pump_main_protocol(void) {
     current_time_ms = 1000;
     protocol_handle_line("PUMP_MAIN:state=1");
@@ -155,7 +131,6 @@ int main(int argc, char **argv) {
     RUN_TEST(test_watchdog_exactly_at_timeout_turns_off);
     RUN_TEST(test_watchdog_after_timeout_no_double_emit);
     RUN_TEST(test_watchdog_stop_before_timeout_cancels);
-    RUN_TEST(test_water_start_then_stop_protocol);
     RUN_TEST(test_pump_main_protocol);
     return UNITY_END();
 }
